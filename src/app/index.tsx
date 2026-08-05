@@ -40,8 +40,8 @@ export default function DayEntryScreen() {
   });
   const [loading, setLoading] = useState(true);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (showLoading = false) => {
+    if (showLoading) setLoading(true);
     try {
       const [mems, ents, total, counts] = await Promise.all([
         getActiveMembers(),
@@ -56,13 +56,13 @@ export default function DayEntryScreen() {
     } catch (e) {
       console.error('Failed to load day data:', e);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, [selectedDate]);
 
   useFocusEffect(
     useCallback(() => {
-      loadData();
+      loadData(true);
     }, [loadData])
   );
 
@@ -74,10 +74,10 @@ export default function DayEntryScreen() {
     };
   };
 
-  const handleToggle = async (memberId: number, meal: MealType) => {
+  const handleToggle = useCallback(async (memberId: number, meal: MealType) => {
     await toggleMeal(memberId, selectedDate, meal);
-    await loadData();
-  };
+    await loadData(false);
+  }, [selectedDate, loadData]);
 
   const handleMarkAll = () => {
     Alert.alert(
@@ -92,7 +92,7 @@ export default function DayEntryScreen() {
               members.map((m) => m.id),
               selectedDate
             );
-            await loadData();
+            await loadData(false);
           },
         },
       ]
@@ -177,9 +177,10 @@ export default function DayEntryScreen() {
           members.map((member, idx) => (
             <MemberRow
               key={member.id}
+              memberId={member.id}
               name={member.name}
               meals={getMealState(member.id)}
-              onToggle={(meal) => handleToggle(member.id, meal)}
+              onToggle={handleToggle}
               index={idx}
             />
           ))
