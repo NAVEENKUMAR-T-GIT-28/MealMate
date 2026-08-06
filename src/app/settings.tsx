@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,13 +13,17 @@ import {
 import { useFocusEffect } from 'expo-router';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { THEME } from '@/utils/theme';
+import { THEME, useAppTheme, useThemeMode, type ThemeColors, type ThemeMode } from '@/utils/theme';
 import { getCurrentPrices, updatePrices, type CurrentPrices } from '@/db/prices.repo';
 import { getDb } from '@/db/database';
 
 export default function SettingsScreen() {
+  const colors = useAppTheme();
+  const { mode, setMode } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [prices, setPrices] = useState<CurrentPrices>({ morning: 0, afternoon: 0, night: 0 });
   const [morningInput, setMorningInput] = useState('');
   const [afternoonInput, setAfternoonInput] = useState('');
@@ -98,25 +102,56 @@ export default function SettingsScreen() {
     }
   };
 
+  const renderThemeOption = (themeMode: ThemeMode, icon: keyof typeof Ionicons.glyphMap, label: string) => {
+    const isActive = mode === themeMode;
+    return (
+      <Pressable
+        style={[styles.themeOption, isActive && styles.themeOptionActive]}
+        onPress={() => setMode(themeMode)}
+      >
+        <Ionicons
+          name={icon}
+          size={20}
+          color={isActive ? '#FFFFFF' : colors.textDim}
+        />
+        <Text style={[styles.themeOptionText, isActive && styles.themeOptionTextActive]}>
+          {label}
+        </Text>
+      </Pressable>
+    );
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Current Prices */}
+        {/* Appearance Settings */}
         <Animated.View entering={FadeIn.duration(300)}>
-          <Text style={styles.sectionTitle}>Meal Prices</Text>
+          <Text style={styles.sectionTitle}>Appearance</Text>
+          <Text style={styles.sectionSubtitle}>Choose your UI theme preference.</Text>
+        </Animated.View>
+        
+        <Animated.View entering={FadeInDown.delay(50)} style={styles.themeSelector}>
+          {renderThemeOption('light', 'sunny-outline', 'Light')}
+          {renderThemeOption('dark', 'moon-outline', 'Dark')}
+          {renderThemeOption('system', 'phone-portrait-outline', 'System')}
+        </Animated.View>
+
+        {/* Current Prices */}
+        <Animated.View entering={FadeInDown.delay(100)}>
+          <Text style={[styles.sectionTitle, { marginTop: THEME.spacing.xl }]}>Meal Prices</Text>
           <Text style={styles.sectionSubtitle}>
             Changes take effect from today onwards. Past calculations stay unchanged.
           </Text>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(100)} style={styles.priceCard}>
+        <Animated.View entering={FadeInDown.delay(150)} style={styles.priceCard}>
           {/* Morning */}
           <View style={styles.priceRow}>
-            <View style={[styles.priceLabel, { backgroundColor: THEME.colors.morningBg }]}>
-              <Text style={{ color: THEME.colors.morning, fontWeight: '600' }}>☀️ Morning</Text>
+            <View style={[styles.priceLabel, { backgroundColor: colors.morningBg }]}>
+              <Text style={{ color: colors.morning, fontWeight: '600' }}>☀️ Morning</Text>
             </View>
             <TextInput
               style={styles.priceInput}
@@ -124,14 +159,14 @@ export default function SettingsScreen() {
               onChangeText={setMorningInput}
               keyboardType="numeric"
               placeholder="0"
-              placeholderTextColor={THEME.colors.textDim}
+              placeholderTextColor={colors.textDim}
             />
           </View>
 
           {/* Afternoon */}
           <View style={styles.priceRow}>
-            <View style={[styles.priceLabel, { backgroundColor: THEME.colors.afternoonBg }]}>
-              <Text style={{ color: THEME.colors.afternoon, fontWeight: '600' }}>🌤️ Afternoon</Text>
+            <View style={[styles.priceLabel, { backgroundColor: colors.afternoonBg }]}>
+              <Text style={{ color: colors.afternoon, fontWeight: '600' }}>🌤️ Afternoon</Text>
             </View>
             <TextInput
               style={styles.priceInput}
@@ -139,14 +174,14 @@ export default function SettingsScreen() {
               onChangeText={setAfternoonInput}
               keyboardType="numeric"
               placeholder="0"
-              placeholderTextColor={THEME.colors.textDim}
+              placeholderTextColor={colors.textDim}
             />
           </View>
 
           {/* Night */}
           <View style={styles.priceRow}>
-            <View style={[styles.priceLabel, { backgroundColor: THEME.colors.nightBg }]}>
-              <Text style={{ color: THEME.colors.night, fontWeight: '600' }}>🌙 Night</Text>
+            <View style={[styles.priceLabel, { backgroundColor: colors.nightBg }]}>
+              <Text style={{ color: colors.night, fontWeight: '600' }}>🌙 Night</Text>
             </View>
             <TextInput
               style={styles.priceInput}
@@ -154,7 +189,7 @@ export default function SettingsScreen() {
               onChangeText={setNightInput}
               keyboardType="numeric"
               placeholder="0"
-              placeholderTextColor={THEME.colors.textDim}
+              placeholderTextColor={colors.textDim}
             />
           </View>
 
@@ -181,14 +216,14 @@ export default function SettingsScreen() {
           <Pressable onPress={handleExport} style={styles.actionCard}>
             <View style={styles.actionLeft}>
               <View style={[styles.actionIcon, { backgroundColor: 'rgba(59, 130, 246, 0.15)' }]}>
-                <Ionicons name="download-outline" size={24} color={THEME.colors.info} />
+                <Ionicons name="download-outline" size={24} color={colors.info} />
               </View>
               <View>
                 <Text style={styles.actionTitle}>Export Backup</Text>
                 <Text style={styles.actionSubtitle}>Save all data as JSON file</Text>
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={THEME.colors.textDim} />
+            <Ionicons name="chevron-forward" size={20} color={colors.textDim} />
           </Pressable>
         </Animated.View>
 
@@ -205,32 +240,61 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: THEME.colors.background,
+    backgroundColor: colors.background,
   },
   content: {
     padding: THEME.spacing.lg,
     paddingBottom: THEME.spacing.xxxl,
   },
   sectionTitle: {
-    color: THEME.colors.text,
+    color: colors.text,
     fontSize: 18,
     fontWeight: '700',
     marginBottom: THEME.spacing.xs,
   },
   sectionSubtitle: {
-    color: THEME.colors.textMuted,
+    color: colors.textMuted,
     fontSize: 13,
     marginBottom: THEME.spacing.lg,
   },
+  themeSelector: {
+    flexDirection: 'row',
+    backgroundColor: colors.card,
+    borderRadius: THEME.radius.lg,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: THEME.spacing.md,
+  },
+  themeOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: THEME.spacing.md,
+    borderRadius: THEME.radius.md,
+    gap: 6,
+  },
+  themeOptionActive: {
+    backgroundColor: colors.primary,
+  },
+  themeOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textDim,
+  },
+  themeOptionTextActive: {
+    color: '#FFFFFF',
+  },
   priceCard: {
-    backgroundColor: THEME.colors.card,
+    backgroundColor: colors.card,
     borderRadius: THEME.radius.xl,
     padding: THEME.spacing.lg,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
     gap: THEME.spacing.md,
   },
   priceRow: {
@@ -247,23 +311,23 @@ const styles = StyleSheet.create({
   },
   priceInput: {
     width: 90,
-    backgroundColor: THEME.colors.background,
+    backgroundColor: colors.background,
     borderRadius: THEME.radius.md,
     paddingHorizontal: THEME.spacing.md,
     paddingVertical: THEME.spacing.md,
-    color: THEME.colors.text,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '700',
     textAlign: 'center',
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
   },
   saveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: THEME.spacing.sm,
-    backgroundColor: THEME.colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: THEME.radius.lg,
     paddingVertical: THEME.spacing.md,
     marginTop: THEME.spacing.sm,
@@ -277,11 +341,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: THEME.colors.card,
+    backgroundColor: colors.card,
     borderRadius: THEME.radius.lg,
     padding: THEME.spacing.lg,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
     marginBottom: THEME.spacing.sm,
   },
   actionLeft: {
@@ -297,12 +361,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   actionTitle: {
-    color: THEME.colors.text,
+    color: colors.text,
     fontSize: 15,
     fontWeight: '600',
   },
   actionSubtitle: {
-    color: THEME.colors.textMuted,
+    color: colors.textMuted,
     fontSize: 12,
     marginTop: 2,
   },
@@ -312,17 +376,17 @@ const styles = StyleSheet.create({
     marginTop: THEME.spacing.xxxl,
   },
   infoTitle: {
-    color: THEME.colors.primary,
+    color: colors.primary,
     fontSize: 16,
     fontWeight: '700',
   },
   infoVersion: {
-    color: THEME.colors.textMuted,
+    color: colors.textMuted,
     fontSize: 12,
     marginTop: 4,
   },
   infoDesc: {
-    color: THEME.colors.textDim,
+    color: colors.textDim,
     fontSize: 12,
     textAlign: 'center',
     marginTop: THEME.spacing.sm,

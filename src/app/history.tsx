@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import Animated, { FadeInLeft } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { THEME } from '@/utils/theme';
+import { THEME, useAppTheme, type ThemeColors } from '@/utils/theme';
 import { getMonthsWithData } from '@/db/summary.repo';
 import { formatMonth } from '@/utils/dateHelpers';
 
@@ -20,6 +20,9 @@ interface MonthItem {
 }
 
 export default function HistoryScreen() {
+  const colors = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [months, setMonths] = useState<MonthItem[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -43,7 +46,7 @@ export default function HistoryScreen() {
   if (loading) {
     return (
       <View style={[styles.container, styles.center]}>
-        <ActivityIndicator size="large" color={THEME.colors.primary} />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -57,7 +60,7 @@ export default function HistoryScreen() {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Ionicons name="calendar-outline" size={64} color={THEME.colors.textDim} />
+            <Ionicons name="calendar-outline" size={64} color={colors.textDim} />
             <Text style={styles.emptyTitle}>No History</Text>
             <Text style={styles.emptySubtitle}>
               Start marking meals on the Today tab to build history
@@ -72,7 +75,7 @@ export default function HistoryScreen() {
             >
               <View style={styles.monthLeft}>
                 <View style={styles.calendarIcon}>
-                  <Ionicons name="calendar" size={24} color={THEME.colors.primary} />
+                  <Ionicons name="calendar" size={24} color={colors.primary} />
                 </View>
                 <View>
                   <Text style={styles.monthName}>{formatMonth(item.month)}</Text>
@@ -81,7 +84,7 @@ export default function HistoryScreen() {
                   </Text>
                 </View>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={THEME.colors.textDim} />
+              <Ionicons name="chevron-forward" size={20} color={colors.textDim} />
             </Pressable>
           </Animated.View>
         )}
@@ -90,10 +93,10 @@ export default function HistoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: THEME.colors.background,
+    backgroundColor: colors.background,
   },
   center: {
     alignItems: 'center',
@@ -107,12 +110,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: THEME.colors.card,
+    backgroundColor: colors.card,
     borderRadius: THEME.radius.lg,
     padding: THEME.spacing.lg,
     marginBottom: THEME.spacing.sm,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
   },
   monthLeft: {
     flexDirection: 'row',
@@ -128,12 +131,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   monthName: {
-    color: THEME.colors.text,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
   monthMeta: {
-    color: THEME.colors.textMuted,
+    color: colors.textMuted,
     fontSize: 12,
     marginTop: 2,
   },
@@ -143,12 +146,12 @@ const styles = StyleSheet.create({
     gap: THEME.spacing.md,
   },
   emptyTitle: {
-    color: THEME.colors.text,
+    color: colors.text,
     fontSize: 20,
     fontWeight: '700',
   },
   emptySubtitle: {
-    color: THEME.colors.textMuted,
+    color: colors.textMuted,
     fontSize: 14,
     textAlign: 'center',
     maxWidth: 260,

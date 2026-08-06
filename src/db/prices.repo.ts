@@ -45,12 +45,23 @@ export async function getPriceForDate(
   date: string
 ): Promise<number> {
   const db = await getDb();
-  const row = await db.getFirstAsync<{ price: number }>(
+  let row = await db.getFirstAsync<{ price: number }>(
     `SELECT price FROM meal_prices 
      WHERE meal_type = ? AND effective_from <= ? 
      ORDER BY effective_from DESC, id DESC LIMIT 1`,
     [mealType, date]
   );
+  
+  if (!row) {
+    // Fallback to the oldest available price if the date is before any price was set
+    row = await db.getFirstAsync<{ price: number }>(
+      `SELECT price FROM meal_prices 
+       WHERE meal_type = ? 
+       ORDER BY effective_from ASC, id ASC LIMIT 1`,
+      [mealType]
+    );
+  }
+  
   return row ? row.price : 0;
 }
 

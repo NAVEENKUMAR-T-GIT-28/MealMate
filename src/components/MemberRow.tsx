@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Animated, { FadeInRight } from 'react-native-reanimated';
 import { MealToggle } from './MealToggle';
-import { THEME } from '@/utils/theme';
+import { THEME, useAppTheme, type ThemeColors } from '@/utils/theme';
 import type { MealType } from '@/db/entries.repo';
 
 interface MemberRowProps {
@@ -20,6 +20,9 @@ export const MemberRow = React.memo(function MemberRow({
   onToggle,
   index,
 }: MemberRowProps) {
+  const colors = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <Animated.View
       entering={FadeInRight.delay(index * 60).springify()}
@@ -66,14 +69,14 @@ export const MemberRow = React.memo(function MemberRow({
   );
 });
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
-    backgroundColor: THEME.colors.card,
+    backgroundColor: colors.card,
     borderRadius: THEME.radius.lg,
     padding: THEME.spacing.lg,
     marginBottom: THEME.spacing.sm,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: colors.border,
   },
   nameSection: {
     flexDirection: 'row',
@@ -85,7 +88,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: THEME.colors.primaryDark,
+    backgroundColor: colors.primaryDark,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -95,7 +98,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   name: {
-    color: THEME.colors.text,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
     flex: 1,

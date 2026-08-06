@@ -43,3 +43,19 @@ export async function getMemberById(id: number): Promise<Member | null> {
   const db = await getDb();
   return db.getFirstAsync<Member>('SELECT * FROM members WHERE id = ?', [id]);
 }
+
+export async function renameMember(id: number, newName: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('UPDATE members SET name = ? WHERE id = ?', [newName.trim(), id]);
+}
+
+/**
+ * Permanently delete a member and all their related data
+ * (meal_entries, payments). This action cannot be undone.
+ */
+export async function deleteMember(id: number): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('DELETE FROM meal_entries WHERE member_id = ?', [id]);
+  await db.runAsync('DELETE FROM payments WHERE member_id = ?', [id]);
+  await db.runAsync('DELETE FROM members WHERE id = ?', [id]);
+}

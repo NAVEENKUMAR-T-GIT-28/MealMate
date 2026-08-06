@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,10 @@ import {
   Pressable,
   ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { THEME } from '@/utils/theme';
+import { THEME, useAppTheme, type ThemeColors } from '@/utils/theme';
 import { SummaryTable } from '@/components/SummaryTable';
 import {
   getMonthlySummary,
@@ -20,6 +20,10 @@ import { getCurrentPrices, type CurrentPrices } from '@/db/prices.repo';
 import { currentMonthStr, formatMonth } from '@/utils/dateHelpers';
 
 export default function SummaryScreen() {
+  const colors = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  const router = useRouter();
   const params = useLocalSearchParams<{ month?: string }>();
   const [month, setMonth] = useState(params.month || currentMonthStr());
   const [summary, setSummary] = useState<MonthSummary | null>(null);
@@ -65,7 +69,7 @@ export default function SummaryScreen() {
   if (loading) {
     return (
       <View style={[styles.container, styles.center]}>
-        <ActivityIndicator size="large" color={THEME.colors.primary} />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -75,29 +79,29 @@ export default function SummaryScreen() {
       {/* Month Navigator */}
       <Animated.View entering={FadeIn.duration(300)} style={styles.monthNav}>
         <Pressable onPress={goToPrevMonth} style={styles.navBtn}>
-          <Ionicons name="chevron-back" size={24} color={THEME.colors.text} />
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
         </Pressable>
         <Text style={styles.monthText}>{formatMonth(month)}</Text>
         <Pressable onPress={goToNextMonth} style={styles.navBtn}>
-          <Ionicons name="chevron-forward" size={24} color={THEME.colors.text} />
+          <Ionicons name="chevron-forward" size={24} color={colors.text} />
         </Pressable>
       </Animated.View>
 
       {/* Price Info */}
       {prices && (
         <Animated.View entering={FadeInDown.delay(100)} style={styles.priceRow}>
-          <View style={[styles.priceChip, { backgroundColor: THEME.colors.morningBg }]}>
-            <Text style={[styles.priceText, { color: THEME.colors.morning }]}>
+          <View style={[styles.priceChip, { backgroundColor: colors.morningBg }]}>
+            <Text style={[styles.priceText, { color: colors.morning }]}>
               ☀️ ₹{prices.morning}
             </Text>
           </View>
-          <View style={[styles.priceChip, { backgroundColor: THEME.colors.afternoonBg }]}>
-            <Text style={[styles.priceText, { color: THEME.colors.afternoon }]}>
+          <View style={[styles.priceChip, { backgroundColor: colors.afternoonBg }]}>
+            <Text style={[styles.priceText, { color: colors.afternoon }]}>
               🌤️ ₹{prices.afternoon}
             </Text>
           </View>
-          <View style={[styles.priceChip, { backgroundColor: THEME.colors.nightBg }]}>
-            <Text style={[styles.priceText, { color: THEME.colors.night }]}>
+          <View style={[styles.priceChip, { backgroundColor: colors.nightBg }]}>
+            <Text style={[styles.priceText, { color: colors.night }]}>
               🌙 ₹{prices.night}
             </Text>
           </View>
@@ -118,11 +122,17 @@ export default function SummaryScreen() {
       {/* Summary Table */}
       {summary && summary.members.length > 0 ? (
         <Animated.View entering={FadeInDown.delay(300)} style={styles.tableContainer}>
-          <SummaryTable members={summary.members} grandTotal={summary.grandTotal} />
+          <SummaryTable
+            members={summary.members}
+            grandTotal={summary.grandTotal}
+            onMemberPress={(memberId) =>
+              router.push(`/summary/member/${memberId}/${month}` as any)
+            }
+          />
         </Animated.View>
       ) : (
         <View style={styles.emptyState}>
-          <Ionicons name="analytics-outline" size={64} color={THEME.colors.textDim} />
+          <Ionicons name="analytics-outline" size={64} color={colors.textDim} />
           <Text style={styles.emptyTitle}>No Data</Text>
           <Text style={styles.emptySubtitle}>
             No meal entries recorded for {formatMonth(month)}
@@ -133,10 +143,10 @@ export default function SummaryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: THEME.colors.background,
+    backgroundColor: colors.background,
   },
   center: {
     alignItems: 'center',
@@ -155,10 +165,10 @@ const styles = StyleSheet.create({
   navBtn: {
     padding: THEME.spacing.sm,
     borderRadius: THEME.radius.full,
-    backgroundColor: THEME.colors.card,
+    backgroundColor: colors.card,
   },
   monthText: {
-    color: THEME.colors.text,
+    color: colors.text,
     fontSize: 20,
     fontWeight: '700',
   },
@@ -178,27 +188,27 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   grandTotalCard: {
-    backgroundColor: THEME.colors.card,
+    backgroundColor: colors.card,
     borderRadius: THEME.radius.xl,
     padding: THEME.spacing.xxl,
     alignItems: 'center',
     marginBottom: THEME.spacing.xl,
     borderWidth: 1,
-    borderColor: THEME.colors.primary,
+    borderColor: colors.primary,
   },
   grandTotalLabel: {
-    color: THEME.colors.textMuted,
+    color: colors.textMuted,
     fontSize: 13,
     fontWeight: '500',
     marginBottom: THEME.spacing.xs,
   },
   grandTotalValue: {
-    color: THEME.colors.primary,
+    color: colors.primary,
     fontSize: 36,
     fontWeight: '700',
   },
   grandTotalSub: {
-    color: THEME.colors.textDim,
+    color: colors.textDim,
     fontSize: 12,
     marginTop: THEME.spacing.xs,
   },
@@ -212,12 +222,12 @@ const styles = StyleSheet.create({
     gap: THEME.spacing.md,
   },
   emptyTitle: {
-    color: THEME.colors.text,
+    color: colors.text,
     fontSize: 20,
     fontWeight: '700',
   },
   emptySubtitle: {
-    color: THEME.colors.textMuted,
+    color: colors.textMuted,
     fontSize: 14,
     textAlign: 'center',
   },

@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, Text, StyleSheet } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
 } from 'react-native-reanimated';
-import { THEME } from '@/utils/theme';
+import { THEME, useAppTheme, type ThemeColors } from '@/utils/theme';
 import type { MealType } from '@/db/entries.repo';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -16,15 +16,18 @@ interface MealToggleProps {
   onToggle: () => void;
 }
 
-const mealConfig: Record<MealType, { label: string; emoji: string; color: string; bgColor: string }> = {
-  morning: { label: 'Morn', emoji: '☀️', color: THEME.colors.morning, bgColor: THEME.colors.morningBg },
-  afternoon: { label: 'Aft', emoji: '🌤️', color: THEME.colors.afternoon, bgColor: THEME.colors.afternoonBg },
-  night: { label: 'Night', emoji: '🌙', color: THEME.colors.night, bgColor: THEME.colors.nightBg },
-};
+const getMealConfig = (colors: ThemeColors): Record<MealType, { label: string; emoji: string; color: string; bgColor: string }> => ({
+  morning: { label: 'Morn', emoji: '☀️', color: colors.morning, bgColor: colors.morningBg },
+  afternoon: { label: 'Aft', emoji: '🌤️', color: colors.afternoon, bgColor: colors.afternoonBg },
+  night: { label: 'Night', emoji: '🌙', color: colors.night, bgColor: colors.nightBg },
+});
 
 export function MealToggle({ mealType, isActive, onToggle }: MealToggleProps) {
+  const colors = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const scale = useSharedValue(1);
-  const config = mealConfig[mealType];
+  const config = getMealConfig(colors)[mealType];
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -66,7 +69,7 @@ export function MealToggle({ mealType, isActive, onToggle }: MealToggleProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   toggle: {
     flexDirection: 'row',
     alignItems: 'center',

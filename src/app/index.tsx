@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
 import { useFocusEffect } from 'expo-router';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { THEME } from '@/utils/theme';
+import { THEME, useAppTheme, type ThemeColors } from '@/utils/theme';
 import { MemberRow } from '@/components/MemberRow';
 import { getActiveMembers, type Member } from '@/db/members.repo';
 import {
@@ -29,6 +29,9 @@ import {
 } from '@/utils/dateHelpers';
 
 export default function DayEntryScreen() {
+  const colors = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [members, setMembers] = useState<Member[]>([]);
   const [entries, setEntries] = useState<MealEntry[]>([]);
@@ -106,7 +109,7 @@ export default function DayEntryScreen() {
   if (loading) {
     return (
       <View style={[styles.container, styles.center]}>
-        <ActivityIndicator size="large" color={THEME.colors.primary} />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -116,7 +119,7 @@ export default function DayEntryScreen() {
       {/* Date Navigator */}
       <Animated.View entering={FadeIn.duration(400)} style={styles.dateNav}>
         <Pressable onPress={goToPrev} style={styles.navBtn}>
-          <Ionicons name="chevron-back" size={24} color={THEME.colors.text} />
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
         </Pressable>
         <Pressable onPress={goToToday} style={styles.dateCenter}>
           <Text style={styles.dateText}>{formatDateDisplay(selectedDate)}</Text>
@@ -125,27 +128,27 @@ export default function DayEntryScreen() {
           )}
         </Pressable>
         <Pressable onPress={goToNext} style={styles.navBtn}>
-          <Ionicons name="chevron-forward" size={24} color={THEME.colors.text} />
+          <Ionicons name="chevron-forward" size={24} color={colors.text} />
         </Pressable>
       </Animated.View>
 
       {/* Day Stats */}
       <Animated.View entering={FadeInDown.delay(100)} style={styles.statsRow}>
-        <View style={[styles.statCard, { borderLeftColor: THEME.colors.morning }]}>
+        <View style={[styles.statCard, { borderLeftColor: colors.morning }]}>
           <Text style={styles.statEmoji}>☀️</Text>
           <Text style={styles.statValue}>{headcounts.morning}</Text>
         </View>
-        <View style={[styles.statCard, { borderLeftColor: THEME.colors.afternoon }]}>
+        <View style={[styles.statCard, { borderLeftColor: colors.afternoon }]}>
           <Text style={styles.statEmoji}>🌤️</Text>
           <Text style={styles.statValue}>{headcounts.afternoon}</Text>
         </View>
-        <View style={[styles.statCard, { borderLeftColor: THEME.colors.night }]}>
+        <View style={[styles.statCard, { borderLeftColor: colors.night }]}>
           <Text style={styles.statEmoji}>🌙</Text>
           <Text style={styles.statValue}>{headcounts.night}</Text>
         </View>
-        <View style={[styles.statCard, { borderLeftColor: THEME.colors.primary }]}>
+        <View style={[styles.statCard, { borderLeftColor: colors.primary }]}>
           <Text style={styles.statLabel}>Total</Text>
-          <Text style={[styles.statValue, { color: THEME.colors.primary }]}>
+          <Text style={[styles.statValue, { color: colors.primary }]}>
             ₹{dayTotal}
           </Text>
         </View>
@@ -167,7 +170,7 @@ export default function DayEntryScreen() {
       >
         {members.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="people-outline" size={64} color={THEME.colors.textDim} />
+            <Ionicons name="people-outline" size={64} color={colors.textDim} />
             <Text style={styles.emptyTitle}>No Members Yet</Text>
             <Text style={styles.emptySubtitle}>
               Go to the Members tab to add people
@@ -190,10 +193,10 @@ export default function DayEntryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: THEME.colors.background,
+    backgroundColor: colors.background,
   },
   center: {
     alignItems: 'center',
@@ -206,23 +209,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: THEME.spacing.lg,
     paddingVertical: THEME.spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: THEME.colors.border,
+    borderBottomColor: colors.border,
   },
   navBtn: {
     padding: THEME.spacing.sm,
     borderRadius: THEME.radius.full,
-    backgroundColor: THEME.colors.card,
+    backgroundColor: colors.card,
   },
   dateCenter: {
     alignItems: 'center',
   },
   dateText: {
-    color: THEME.colors.text,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '700',
   },
   todayHint: {
-    color: THEME.colors.primary,
+    color: colors.primary,
     fontSize: 11,
     marginTop: 2,
   },
@@ -234,7 +237,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: THEME.colors.card,
+    backgroundColor: colors.card,
     borderRadius: THEME.radius.md,
     padding: THEME.spacing.sm,
     alignItems: 'center',
@@ -244,12 +247,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   statLabel: {
-    color: THEME.colors.textMuted,
+    color: colors.textMuted,
     fontSize: 11,
     fontWeight: '600',
   },
   statValue: {
-    color: THEME.colors.text,
+    color: colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
@@ -260,7 +263,7 @@ const styles = StyleSheet.create({
     gap: THEME.spacing.sm,
     marginHorizontal: THEME.spacing.lg,
     marginBottom: THEME.spacing.md,
-    backgroundColor: THEME.colors.primaryDark,
+    backgroundColor: colors.primaryDark,
     paddingVertical: THEME.spacing.md,
     borderRadius: THEME.radius.lg,
   },
@@ -283,12 +286,12 @@ const styles = StyleSheet.create({
     gap: THEME.spacing.md,
   },
   emptyTitle: {
-    color: THEME.colors.text,
+    color: colors.text,
     fontSize: 20,
     fontWeight: '700',
   },
   emptySubtitle: {
-    color: THEME.colors.textMuted,
+    color: colors.textMuted,
     fontSize: 14,
     textAlign: 'center',
   },

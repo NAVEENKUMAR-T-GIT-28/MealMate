@@ -1,13 +1,18 @@
 import * as SQLite from 'expo-sqlite';
 import { todayStr } from '@/utils/dateHelpers';
 
-let _db: SQLite.SQLiteDatabase | null = null;
-
-export async function getDb(): Promise<SQLite.SQLiteDatabase> {
-  if (_db) return _db;
-  _db = await SQLite.openDatabaseAsync('pg_food_tracker.db');
-  await initSchema(_db);
-  return _db;
+export function getDb(): Promise<SQLite.SQLiteDatabase> {
+  // @ts-ignore - use global object to preserve connection across HMR
+  if (!globalThis._dbPromise) {
+    // @ts-ignore
+    globalThis._dbPromise = (async () => {
+      const db = await SQLite.openDatabaseAsync('pg_food_tracker.db');
+      await initSchema(db);
+      return db;
+    })();
+  }
+  // @ts-ignore
+  return globalThis._dbPromise;
 }
 
 async function initSchema(db: SQLite.SQLiteDatabase): Promise<void> {
