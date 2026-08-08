@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,15 +9,17 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Modal
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import { THEME, useAppTheme, useThemeMode, type ThemeColors, type ThemeMode } from '@/utils/theme';
 import { getCurrentPrices, updatePrices, type CurrentPrices } from '@/db/prices.repo';
-import { getDb } from '@/db/database';
+import { getMonthsWithData } from '@/db/summary.repo';
+import { format, parseISO } from 'date-fns';
+import { exportToExcel } from '@/utils/exportExcel';
+import { exportToPdf } from '@/utils/exportPdf';
 
 export default function SettingsScreen() {
   const colors = useAppTheme();
@@ -30,6 +32,11 @@ export default function SettingsScreen() {
   const [nightInput, setNightInput] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const [months, setMonths] = useState<{month: string}[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [isMonthPickerVisible, setMonthPickerVisible] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
   const loadPrices = useCallback(async () => {
     const p = await getCurrentPrices();
     setPrices(p);
@@ -38,10 +45,25 @@ export default function SettingsScreen() {
     setNightInput(String(p.night));
   }, []);
 
+  const loadMonths = useCallback(async () => {
+    const data = await getMonthsWithData();
+    if (data && data.length > 0) {
+      setMonths(data);
+      if (!selectedMonth) {
+        setSelectedMonth(data[0].month);
+      }
+    } else {
+      const current = format(new Date(), 'yyyy-MM');
+      setMonths([{ month: current }]);
+      setSelectedMonth(current);
+    }
+  }, [selectedMonth]);
+
   useFocusEffect(
     useCallback(() => {
       loadPrices();
-    }, [loadPrices])
+      loadMonths();
+    }, [loadPrices, loadMonths])
   );
 
   const handleSavePrices = async () => {
@@ -66,39 +88,27 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleExport = async () => {
+  const handleExportExcel = async () => {
+    if (!selectedMonth) return;
+    setExporting(true);
     try {
-      const db = await getDb();
-
-      const members = await db.getAllAsync('SELECT * FROM members');
-      const entries = await db.getAllAsync('SELECT * FROM meal_entries');
-      const mealPrices = await db.getAllAsync('SELECT * FROM meal_prices');
-      const payments = await db.getAllAsync('SELECT * FROM payments');
-
-      const backup = {
-        exportedAt: new Date().toISOString(),
-        version: 1,
-        members,
-        meal_entries: entries,
-        meal_prices: mealPrices,
-        payments,
-      };
-
-      const json = JSON.stringify(backup, null, 2);
-      const fileUri = FileSystem.documentDirectory + 'pg_food_tracker_backup.json';
-      await FileSystem.writeAsStringAsync(fileUri, json);
-
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (isAvailable) {
-        await Sharing.shareAsync(fileUri, {
-          mimeType: 'application/json',
-          dialogTitle: 'Export PG Food Tracker Backup',
-        });
-      } else {
-        Alert.alert('Export', 'Sharing is not available on this device. File saved to app storage.');
-      }
+      await exportToExcel(selectedMonth);
     } catch (e: any) {
       Alert.alert('Export Failed', e.message || 'Unknown error');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportPdf = async () => {
+    if (!selectedMonth) return;
+    setExporting(true);
+    try {
+      await exportToPdf(selectedMonth);
+    } catch (e: any) {
+      Alert.alert('Export Failed', e.message || 'Unknown error');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -119,6 +129,11 @@ export default function SettingsScreen() {
         </Text>
       </Pressable>
     );
+  };
+
+  const getMonthDisplay = (m: string) => {
+    if (!m) return 'Select Month';
+    return format(parseISO(`${m}-01`), 'MMMM yyyy');
   };
 
   return (
@@ -205,37 +220,97 @@ export default function SettingsScreen() {
           </Pressable>
         </Animated.View>
 
-        {/* Data Management */}
+        {/* Reports & Export */}
         <Animated.View entering={FadeInDown.delay(200)}>
           <Text style={[styles.sectionTitle, { marginTop: THEME.spacing.xxl }]}>
-            Data Management
+            Reports
           </Text>
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(300)}>
-          <Pressable onPress={handleExport} style={styles.actionCard}>
-            <View style={styles.actionLeft}>
-              <View style={[styles.actionIcon, { backgroundColor: 'rgba(59, 130, 246, 0.15)' }]}>
-                <Ionicons name="download-outline" size={24} color={colors.info} />
-              </View>
-              <View>
-                <Text style={styles.actionTitle}>Export Backup</Text>
-                <Text style={styles.actionSubtitle}>Save all data as JSON file</Text>
-              </View>
+          <View style={styles.reportsCard}>
+            <Text style={styles.label}>Select Month</Text>
+            <Pressable 
+              style={styles.monthPickerBtn} 
+              onPress={() => setMonthPickerVisible(true)}
+            >
+              <Text style={styles.monthPickerText}>{getMonthDisplay(selectedMonth)}</Text>
+              <Ionicons name="chevron-down" size={20} color={colors.textDim} />
+            </Pressable>
+
+            <View style={styles.exportRow}>
+              <Pressable 
+                style={[styles.exportBtn, { backgroundColor: '#107c41' }, exporting && { opacity: 0.6 }]} 
+                onPress={handleExportExcel}
+                disabled={exporting}
+              >
+                <Ionicons name="document-text-outline" size={20} color="#FFF" />
+                <Text style={styles.exportBtnText}>Export Excel (.xlsx)</Text>
+              </Pressable>
+
+              <Pressable 
+                style={[styles.exportBtn, { backgroundColor: '#d32f2f' }, exporting && { opacity: 0.6 }]} 
+                onPress={handleExportPdf}
+                disabled={exporting}
+              >
+                <Ionicons name="document-outline" size={20} color="#FFF" />
+                <Text style={styles.exportBtnText}>Export PDF (.pdf)</Text>
+              </Pressable>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.textDim} />
-          </Pressable>
+          </View>
         </Animated.View>
 
         {/* App Info */}
         <Animated.View entering={FadeInDown.delay(400)} style={styles.infoCard}>
-          <Text style={styles.infoTitle}>PG Food Expense Tracker</Text>
+          <Text style={styles.infoTitle}>MealMate</Text>
           <Text style={styles.infoVersion}>v1.0.0 — 100% Offline</Text>
           <Text style={styles.infoDesc}>
             All data is stored locally on your device. No internet required.
           </Text>
         </Animated.View>
       </ScrollView>
+
+      {/* Custom Month Picker Modal */}
+      <Modal
+        visible={isMonthPickerVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setMonthPickerVisible(false)}
+      >
+        <Pressable 
+          style={styles.modalOverlay}
+          onPress={() => setMonthPickerVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Month</Text>
+            <ScrollView style={{ maxHeight: 300 }}>
+              {months.map((m) => (
+                <Pressable
+                  key={m.month}
+                  style={[
+                    styles.modalOption,
+                    selectedMonth === m.month && { backgroundColor: colors.primary + '15' }
+                  ]}
+                  onPress={() => {
+                    setSelectedMonth(m.month);
+                    setMonthPickerVisible(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.modalOptionText,
+                    selectedMonth === m.month && { color: colors.primary, fontWeight: '700' }
+                  ]}>
+                    {getMonthDisplay(m.month)}
+                  </Text>
+                  {selectedMonth === m.month && (
+                    <Ionicons name="checkmark" size={20} color={colors.primary} />
+                  )}
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -337,38 +412,52 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     fontWeight: '700',
     fontSize: 15,
   },
-  actionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  reportsCard: {
     backgroundColor: colors.card,
-    borderRadius: THEME.radius.lg,
+    borderRadius: THEME.radius.xl,
     padding: THEME.spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    marginBottom: THEME.spacing.sm,
-  },
-  actionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: THEME.spacing.md,
   },
-  actionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
+  label: {
+    color: colors.textDim,
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
   },
-  actionTitle: {
+  monthPickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: THEME.radius.md,
+    padding: THEME.spacing.md,
+  },
+  monthPickerText: {
     color: colors.text,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
   },
-  actionSubtitle: {
-    color: colors.textMuted,
-    fontSize: 12,
-    marginTop: 2,
+  exportRow: {
+    flexDirection: 'column',
+    gap: THEME.spacing.sm,
+    marginTop: THEME.spacing.sm,
+  },
+  exportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: THEME.spacing.sm,
+    borderRadius: THEME.radius.lg,
+    paddingVertical: THEME.spacing.md,
+  },
+  exportBtnText: {
+    color: '#FFF',
+    fontWeight: '700',
+    fontSize: 15,
   },
   infoCard: {
     alignItems: 'center',
@@ -392,4 +481,37 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     marginTop: THEME.spacing.sm,
     maxWidth: 250,
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    backgroundColor: colors.card,
+    borderRadius: THEME.radius.xl,
+    padding: THEME.spacing.lg,
+  },
+  modalTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: THEME.spacing.md,
+    textAlign: 'center',
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: THEME.spacing.md,
+    paddingHorizontal: THEME.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalOptionText: {
+    color: colors.text,
+    fontSize: 16,
+  }
 });

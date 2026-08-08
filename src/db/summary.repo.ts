@@ -42,30 +42,28 @@ export async function getMonthlySummary(monthStr: string): Promise<MonthSummary>
   let grandTotal = 0;
 
   for (const member of members) {
-    const counts = await db.getAllAsync<{ meal_type: MealType; cnt: number }>(
-      `SELECT meal_type, COUNT(*) as cnt FROM meal_entries
-       WHERE member_id = ? AND date >= ? AND date <= ? AND ate = 1
-       GROUP BY meal_type`,
+    // We get all attendance records for this member in the given month.
+    const entries = await db.getAllAsync<{ meal_type: MealType; date: string }>(
+      `SELECT meal_type, date FROM meal_entries
+       WHERE member_id = ? AND date >= ? AND date <= ? AND ate = 1`,
       [member.id, startDate, endDate]
     );
 
     const countMap: Record<MealType, number> = { morning: 0, afternoon: 0, night: 0 };
-    for (const row of counts) {
-      countMap[row.meal_type] = row.cnt;
+    let morningCost = 0;
+    let afternoonCost = 0;
+    let nightCost = 0;
+
+    // Calculate exact daily cost for each entry
+    for (const entry of entries) {
+      countMap[entry.meal_type]++;
+      const price = await getPriceForDate(entry.meal_type, entry.date);
+      if (entry.meal_type === 'morning') morningCost += price;
+      else if (entry.meal_type === 'afternoon') afternoonCost += price;
+      else if (entry.meal_type === 'night') nightCost += price;
     }
 
-    // For cost calculation we use a representative price (latest effective in month).
-    // A more precise approach would compute per-day, but for typical use (same price
-    // all month) this is correct and much faster.
-    const morningPrice = await getPriceForDate('morning', endDate);
-    const afternoonPrice = await getPriceForDate('afternoon', endDate);
-    const nightPrice = await getPriceForDate('night', endDate);
-
-    const morningCost = countMap.morning * morningPrice;
-    const afternoonCost = countMap.afternoon * afternoonPrice;
-    const nightCost = countMap.night * nightPrice;
     const totalCost = morningCost + afternoonCost + nightCost;
-
     grandTotal += totalCost;
 
     summaries.push({
@@ -138,4 +136,48 @@ export async function getMonthsWithData(): Promise<
      FROM meal_entries WHERE ate = 1
      GROUP BY month ORDER BY month DESC`
   );
+}
+
+/**
+ * Get all months with their total spending, calculated using historical prices.
+ * Returns months sorted descending (most recent first).
+ */
+export async function getMonthsWithTotals(): Promise<
+  { month: string; entryCount: number; totalSpent: number }[]
+> {
+  const db = await getDb();
+
+  // Get all months with data
+  const months = await db.getAllAsync<{ month: string; entryCount: number }>(
+    `SELECT substr(date, 1, 7) as month, COUNT(*) as entryCount
+     FROM meal_entries WHERE ate = 1
+     GROUP BY month ORDER BY month DESC`
+  );
+
+  const results: { month: string; entryCount: number; totalSpent: number }[] = [];
+
+  for (const m of months) {
+    const startDate = `${m.month}-01`;
+    const endDate = `${m.month}-31`;
+
+    // Get all individual entries to calculate with historical pricing
+    const entries = await db.getAllAsync<{ meal_type: MealType; date: string }>(
+      `SELECT meal_type, date FROM meal_entries
+       WHERE date >= ? AND date <= ? AND ate = 1`,
+      [startDate, endDate]
+    );
+
+    let totalSpent = 0;
+    for (const entry of entries) {
+      totalSpent += await getPriceForDate(entry.meal_type, entry.date);
+    }
+
+    results.push({
+      month: m.month,
+      entryCount: m.entryCount,
+      totalSpent,
+    });
+  }
+
+  return results;
 }

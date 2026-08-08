@@ -1,7 +1,7 @@
-# Food Expense Tracker - Technical Codebase & System Design Report
+# MealMate - Technical Codebase & System Design Report
 
 ## 1. Project Overview
-The PG Food Expense Tracker is a 100% offline-first, mobile-optimized React Native application built with the Expo framework. It is designed to track daily meal attendance and calculate associated food expenses for members in a PG (Paying Guest) or hostel environment. 
+The MealMate is a 100% offline-first, mobile-optimized React Native application built with the Expo framework. It is designed to track daily meal attendance and calculate associated food expenses for members in a PG (Paying Guest) or hostel environment. 
 
 The application architecture strictly adheres to a local-first philosophy, ensuring data privacy and offline usability.
 

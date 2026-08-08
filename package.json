@@ -1,5 +1,5 @@
 {
-  "name": "food-expense-tracker",
+  "name": "meal-mate",
   "main": "expo-router/entry",
   "version": "1.0.0",
   "dependencies": {
@@ -30,7 +30,9 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-web": "~0.21.0",
-    "react-native-worklets": "0.10.1"
+    "react-native-worklets": "0.10.1",
+    "expo-print": "~57.0.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",

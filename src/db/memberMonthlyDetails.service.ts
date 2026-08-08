@@ -51,12 +51,6 @@ export async function getMemberMonthlyDetails(
     entryMap.get(entry.date)!.add(entry.meal_type);
   }
 
-  // Get prices (use end-of-month date for the representative price)
-  const lastDay = allDays[allDays.length - 1];
-  const morningPrice = await getPriceForDate('morning', lastDay);
-  const afternoonPrice = await getPriceForDate('afternoon', lastDay);
-  const nightPrice = await getPriceForDate('night', lastDay);
-
   // Build day-by-day details and aggregate counts
   let morningCount = 0;
   let afternoonCount = 0;
@@ -65,34 +59,47 @@ export async function getMemberMonthlyDetails(
   let afternoonTotal = 0;
   let nightTotal = 0;
 
-  const days: DayDetail[] = allDays.map((date) => {
+  const days: DayDetail[] = [];
+
+  for (const date of allDays) {
     const meals = entryMap.get(date);
     const morning = meals?.has('morning') ?? false;
     const afternoon = meals?.has('afternoon') ?? false;
     const night = meals?.has('night') ?? false;
 
+    // Fetch exact historical price for this specific date
+    const dMorningPrice = await getPriceForDate('morning', date);
+    const dAfternoonPrice = await getPriceForDate('afternoon', date);
+    const dNightPrice = await getPriceForDate('night', date);
+
     if (morning) {
       morningCount++;
-      morningTotal += morningPrice;
+      morningTotal += dMorningPrice;
     }
     if (afternoon) {
       afternoonCount++;
-      afternoonTotal += afternoonPrice;
+      afternoonTotal += dAfternoonPrice;
     }
     if (night) {
       nightCount++;
-      nightTotal += nightPrice;
+      nightTotal += dNightPrice;
     }
 
     const dayTotal =
-      (morning ? morningPrice : 0) +
-      (afternoon ? afternoonPrice : 0) +
-      (night ? nightPrice : 0);
+      (morning ? dMorningPrice : 0) +
+      (afternoon ? dAfternoonPrice : 0) +
+      (night ? dNightPrice : 0);
 
-    return { date, morning, afternoon, night, dayTotal };
-  });
+    days.push({ date, morning, afternoon, night, dayTotal });
+  }
 
   const grandTotal = morningTotal + afternoonTotal + nightTotal;
+
+  // We can return the end-of-month prices as a reference in the UI header
+  const lastDay = allDays[allDays.length - 1];
+  const morningPriceRef = await getPriceForDate('morning', lastDay);
+  const afternoonPriceRef = await getPriceForDate('afternoon', lastDay);
+  const nightPriceRef = await getPriceForDate('night', lastDay);
 
   return {
     member: { id: member.id, name: member.name },
@@ -105,6 +112,6 @@ export async function getMemberMonthlyDetails(
     nightTotal,
     grandTotal,
     days,
-    prices: { morning: morningPrice, afternoon: afternoonPrice, night: nightPrice },
+    prices: { morning: morningPriceRef, afternoon: afternoonPriceRef, night: nightPriceRef },
   };
 }
