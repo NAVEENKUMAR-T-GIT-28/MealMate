@@ -18,14 +18,26 @@ export async function exportToPdf(monthStr: string) {
        if (firstMemberDetails) prices = firstMemberDetails.prices;
     }
 
-    const asset = await Asset.fromModule(require('../../assets/images/favicon.png')).downloadAsync();
-    
-    let logoSrc = asset.uri;
-    if (Platform.OS !== 'web') {
-      const base64Logo = await FileSystem.readAsStringAsync(asset.localUri || asset.uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      logoSrc = `data:image/png;base64,${base64Logo}`;
+    let logoHtml = '';
+    try {
+      const asset = Asset.fromModule(require('../../assets/images/favicon.png'));
+      await asset.downloadAsync();
+      
+      let logoSrc = asset.uri;
+      if (Platform.OS !== 'web') {
+        if (asset.localUri) {
+          const base64Logo = await FileSystem.readAsStringAsync(asset.localUri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          logoSrc = `data:image/png;base64,${base64Logo}`;
+        } else {
+          throw new Error('Local URI not available for asset');
+        }
+      }
+      logoHtml = `<img src="${logoSrc}" class="report-logo" />`;
+    } catch (e) {
+      console.warn('Failed to load logo for PDF:', e);
+      // Fallback: Continue without logo if it fails
     }
 
     let html = `
@@ -134,7 +146,7 @@ export async function exportToPdf(monthStr: string) {
     // --------------------------------------------------------
     html += `
       <div class="report-header">
-        <img src="${logoSrc}" class="report-logo" />
+        ${logoHtml}
         <div class="report-title-container">
           <div class="title">MealMate</div>
           <div class="subtitle">Monthly Report for ${monthFormatted}</div>
@@ -302,14 +314,39 @@ export async function exportToPdf(monthStr: string) {
     printWindow.print();
   };
 } else {
-      // Generate PDF for native
+      console.log('PDF: starting generation');
       const { uri } = await Print.printToFileAsync({
         html,
-        base64: false
       });
 
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri);
+      const filename = `MealMate_Report_${monthStr}.pdf`;
+      const finalUri = `${FileSystem.cacheDirectory}${filename}`;
+
+      await FileSystem.copyAsync({
+        from: uri,
+        to: finalUri,
+      });
+
+      const info = await FileSystem.getInfoAsync(finalUri);
+
+      console.log('PDF: generated', uri);
+      console.log('PDF: final URI:', finalUri);
+      console.log('PDF: exists:', info.exists);
+      if (info.exists) {
+        console.log('PDF: size:', info.size);
+      }
+
+      console.log('PDF: starting share');
+      const isSharingAvailable = await Sharing.isAvailableAsync();
+      console.log('Sharing available:', isSharingAvailable);
+
+      if (isSharingAvailable) {
+        await Sharing.shareAsync(finalUri, {
+          mimeType: 'application/pdf',
+          dialogTitle: filename,
+          UTI: 'com.adobe.pdf'
+        });
+        console.log('PDF: share completed');
       }
     }
 

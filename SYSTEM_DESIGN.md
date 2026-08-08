@@ -12,7 +12,7 @@ The application architecture strictly adheres to a local-first philosophy, ensur
 - **Storage/Database**: SQLite (`expo-sqlite`)
 - **Animations**: React Native Reanimated (`react-native-reanimated`)
 - **Icons**: Expo Vector Icons (`@expo/vector-icons` - Ionicons)
-- **Data Export**: `expo-file-system/legacy` & `expo-sharing`
+- **Data Export**: `expo-print` (PDF), `xlsx` (Excel), `expo-file-system/legacy` & `expo-sharing`
 - **Date Handling**: `date-fns`
 
 ## 3. System Architecture
@@ -36,14 +36,16 @@ src/
 ├── db/                   # Data Access Layer (SQLite)
 │   ├── database.ts       # Connection pooling & Schema initialization
 │   ├── entries.repo.ts   # CRUD for meal entries
+│   ├── memberMonthlyDetails.service.ts # Core logic for calculating member attendance & pricing
 │   ├── members.repo.ts   # CRUD for members
-│   ├── payments.repo.ts  # CRUD for payments
 │   ├── prices.repo.ts    # Price management logic
 │   └── summary.repo.ts   # Complex aggregation queries
 └── utils/                # Utilities & Context Providers
     ├── ThemeProvider.tsx # Global UI state for Light/Dark themes
     ├── theme.ts          # Color palettes and hooks
-    └── dateHelpers.ts    # Date manipulation functions
+    ├── dateHelpers.ts    # Date manipulation functions
+    ├── exportPdf.ts      # HTML & PDF generation logic via expo-print
+    └── exportExcel.ts    # XLSX spreadsheet generation via xlsx
 ```
 
 ## 4. Data Layer & Schema Design
@@ -59,8 +61,7 @@ The app utilizes a relational schema within a local SQLite database (`pg_food_tr
   - *Unique Constraint*: `(member_id, date, meal_type)` prevents duplicate records.
 - **`meal_prices`**: Historical tracking of meal costs.
   - `id` (PK), `meal_type` (TEXT check), `price` (REAL), `effective_from` (TEXT).
-- **`payments`**: Records payments made by members towards their monthly bill.
-  - `id` (PK), `member_id` (FK), `month` (TEXT), `amount_paid` (REAL), `note` (TEXT).
+
 
 ### 4.2 Data Access Pattern (Repository Pattern)
 The application separates UI from data logic using the Repository Pattern. Files in `src/db/` export async functions that execute SQLite queries (`runAsync`, `getAllAsync`, `getFirstAsync`). This ensures components remain focused on presentation while database transactions are localized.
@@ -83,7 +84,7 @@ Expo Router is utilized to maintain deep-linkable, predictable navigation paths:
 1. **Daily Attendance Marking (`index.tsx`)**: Utilizes `react-native-reanimated` to spring-animate meal toggles. Toggling instantly writes to the `meal_entries` table.
 2. **Member Lifecycle (`members.tsx`)**: Full CRUD support for members, including renaming (UI modal) and cascading deletion of associated historical data.
 3. **Complex Aggregation (`summary.repo.ts`)**: Calculates the dynamic monthly bill for each member by querying `meal_entries` and multiplying by the *effective* `meal_prices` active during that specific period.
-4. **Offline Data Portability (`settings.tsx`)**: Generates a complete JSON backup of the SQLite database and uses `expo-sharing` to allow the user to email, save, or share their data securely.
+4. **Offline Data Portability (`settings.tsx`)**: Generates complete offline exports including deterministically paginated PDF Reports via `expo-print` and fully formatted Excel sheets via `xlsx`.
 
 ## 7. Configuration & Environment
 - **Expo Router SDK 57 Compatibility**: To align with Expo Router v4+, `react-navigation` dependencies were explicitly removed from `package.json`, and dynamic header/tab styling was delegated exclusively to Expo Router's native `screenOptions` to avoid context conflicts.

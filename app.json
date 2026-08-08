@@ -2,16 +2,14 @@
   "expo": {
     "name": "MealMate",
     "slug": "mealmate",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "mealmate",
     "userInterfaceStyle": "automatic",
-
     "ios": {
       "icon": "./assets/images/icon.png"
     },
-
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#F8FAFC",
@@ -22,12 +20,10 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.naveen.mealmate"
     },
-
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-
     "plugins": [
       "expo-router",
       [
@@ -40,17 +36,16 @@
       ],
       "expo-font"
     ],
-
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
-
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "7f779f2a-a8e2-4881-9fe0-027a22f00440"
+        "projectId": "6626d437-59cc-4954-812e-3e8cf3bfe72e"
       }
-    }
+    },
+    "owner": "naveen28"
   }
 }

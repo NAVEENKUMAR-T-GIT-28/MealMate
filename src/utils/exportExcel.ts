@@ -20,12 +20,12 @@ export async function exportToExcel(monthStr: string) {
     const monthlyWsData: any[][] = [];
     monthlyWsData.push([`MealMate Report for ${monthFormatted}`]);
     monthlyWsData.push([]);
-    
+
     // We assume the active prices at end-of-month for the summary header (as in the UI)
     let prices = { morning: 0, afternoon: 0, night: 0 };
     if (summary.members.length > 0) {
-       const firstMemberDetails = await getMemberMonthlyDetails(summary.members[0].memberId, monthStr);
-       if (firstMemberDetails) prices = firstMemberDetails.prices;
+      const firstMemberDetails = await getMemberMonthlyDetails(summary.members[0].memberId, monthStr);
+      if (firstMemberDetails) prices = firstMemberDetails.prices;
     }
 
     monthlyWsData.push(['Meal Type', 'Amount']);
@@ -34,7 +34,7 @@ export async function exportToExcel(monthStr: string) {
     monthlyWsData.push(['Night', `₹${prices.night}`]);
     monthlyWsData.push(['Total', `₹${prices.morning + prices.afternoon + prices.night}`]);
     monthlyWsData.push([]);
-    
+
     monthlyWsData.push(['Name', 'Morning', 'Afternoon', 'Night', 'Total']);
     for (const member of summary.members) {
       monthlyWsData.push([
@@ -71,7 +71,7 @@ export async function exportToExcel(monthStr: string) {
       memberWsData.push([]);
 
       memberWsData.push(['Date', 'Morning', 'Afternoon', 'Night', 'Total']);
-      
+
       for (const day of details.days) {
         const dateFormatted = format(parseISO(day.date), 'dd/MM/yyyy');
         memberWsData.push([
@@ -87,7 +87,7 @@ export async function exportToExcel(monthStr: string) {
       memberWsData.push(['Monthly Total', '', '', '', `₹${details.grandTotal}`]);
 
       const wsMember = XLSX.utils.aoa_to_sheet(memberWsData);
-      
+
       // Sheet names max 31 chars
       let safeSheetName = details.member.name.substring(0, 31);
       XLSX.utils.book_append_sheet(wb, wsMember, safeSheetName);
