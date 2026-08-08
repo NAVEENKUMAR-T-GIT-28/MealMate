@@ -85,14 +85,6 @@ async function initSchema(db: SQLite.SQLiteDatabase): Promise<void> {
       price REAL NOT NULL,
       effective_from TEXT NOT NULL
     );
-
-    CREATE TABLE IF NOT EXISTS payments (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      member_id INTEGER NOT NULL REFERENCES members(id),
-      month TEXT NOT NULL,
-      amount_paid REAL NOT NULL DEFAULT 0,
-      note TEXT
-    );
   `);
 
   // Seed default prices if none exist
