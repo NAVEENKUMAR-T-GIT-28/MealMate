@@ -1,0 +1,138 @@
+.attendance-page {
+  max-width: 750px;
+}
+
+/* Member Selector Chips */
+.member-selector {
+  display: flex;
+  gap: var(--sp-sm);
+  overflow-x: auto;
+  padding-bottom: var(--sp-md);
+  margin-bottom: var(--sp-lg);
+  -webkit-overflow-scrolling: touch;
+}
+
+.member-selector::-webkit-scrollbar {
+  height: 0;
+}
+
+.member-chip {
+  flex-shrink: 0;
+  padding: var(--sp-sm) var(--sp-lg);
+  border-radius: var(--r-full);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--card);
+  border: 1px solid var(--border);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.member-chip:hover {
+  border-color: var(--primary);
+  color: var(--text);
+}
+
+.member-chip.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* Calendar */
+.calendar {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+}
+
+.calendar-header {
+  display: grid;
+  grid-template-columns: 80px repeat(3, 1fr);
+  gap: var(--sp-sm);
+  padding: var(--sp-md) var(--sp-lg);
+  background: var(--primary-alpha);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  text-align: center;
+}
+
+.calendar-header span:first-child {
+  text-align: left;
+}
+
+.calendar-body {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.calendar-row {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  align-items: center;
+  padding: var(--sp-sm) var(--sp-lg);
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s ease;
+}
+
+.calendar-row:last-child {
+  border-bottom: none;
+}
+
+.calendar-row:hover {
+  background: var(--primary-alpha-light);
+}
+
+.calendar-row.today {
+  background: var(--primary-alpha);
+}
+
+.calendar-row.future {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.calendar-date {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-sm);
+}
+
+.calendar-day-num {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  min-width: 24px;
+}
+
+.calendar-day-name {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.calendar-meals {
+  display: flex;
+  gap: var(--sp-sm);
+  justify-content: center;
+}
+
+@media (max-width: 500px) {
+  .calendar-header {
+    grid-template-columns: 60px repeat(3, 1fr);
+    font-size: 11px;
+    padding: var(--sp-sm) var(--sp-md);
+  }
+
+  .calendar-row {
+    grid-template-columns: 60px 1fr;
+    padding: var(--sp-sm) var(--sp-md);
+  }
+
+  .calendar-meals {
+    gap: 4px;
+  }
+}

@@ -1,0 +1,51 @@
+.meal-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: var(--r-full);
+  min-width: 78px;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+              background 0.15s ease,
+              border-color 0.15s ease;
+  border: 1px solid var(--meal-color);
+  background: var(--meal-bg);
+  user-select: none;
+}
+
+.meal-toggle .meal-toggle-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--meal-color);
+}
+
+.meal-toggle .meal-toggle-emoji {
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Active state */
+.meal-toggle.active {
+  background: var(--meal-color);
+  border-color: var(--meal-color);
+}
+
+.meal-toggle.active .meal-toggle-label {
+  color: #fff;
+}
+
+/* Press animation (spring scale) */
+.meal-toggle.pressed {
+  transform: scale(0.9);
+}
+
+.meal-toggle:not(.pressed) {
+  transform: scale(1);
+}
+
+/* Hover */
+.meal-toggle:hover {
+  filter: brightness(1.1);
+}

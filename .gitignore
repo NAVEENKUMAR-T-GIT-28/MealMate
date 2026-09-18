@@ -1,43 +1,93 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
-node_modules/
-
-# Expo
-.expo/
-dist/
-web-build/
-expo-env.d.ts
-
-# Native
-.kotlin/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-
-# Metro
-.metro-health-check*
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# macOS
+# =========================
+# OS Files
+# =========================
 .DS_Store
-*.pem
+Thumbs.db
+*.swp
+*~
 
-# local env files
+# =========================
+# Node.js (All Projects)
+# =========================
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+pnpm-debug.log
+*.log
+.npm/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 .env*.local
 
-# typescript
-*.tsbuildinfo
+# =========================
+# Frontend (Web / React / Vite)
+# =========================
+frontend/dist/
+frontend/build/
+frontend/.next/
+frontend/out/
 
-example
+# Catch-all for generic build outputs
+dist/
+build/
+out/
 
-# generated native folders
-/ios
-/android
+# =========================
+# Backend (Express / Node)
+# =========================
+backend/uploads/
+backend/dist/
+*.sqlite3
+*.db
+
+# =========================
+# App (React Native / Expo)
+# =========================
+# Expo specific
+.expo/
+app/.expo/
+app/web-build/
+
+# Android
+app/android/app/build/
+app/android/.gradle/
+app/android/local.properties
+app/android/build/
+app/android/app/src/main/assets/
+
+# iOS
+app/ios/Pods/
+app/ios/build/
+app/ios/*.xcworkspace/xcuserdata/
+app/ios/*.xcodeproj/project.xcworkspace/xcuserdata/
+app/ios/DerivedData/
+
+# Ruby / CocoaPods
+app/vendor/bundle/
+
+# React Native specific caches
+.eslintcache
+.stylelintcache
+metro.config.local.js
+.react-native/
+
+# =========================
+# Editor & IDE
+# =========================
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

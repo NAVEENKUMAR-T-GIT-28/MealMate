@@ -1,0 +1,67 @@
+.summary-page {
+  max-width: 750px;
+}
+
+/* Price Chips */
+.price-chips {
+  display: flex;
+  gap: var(--sp-sm);
+  justify-content: center;
+  margin-bottom: var(--sp-lg);
+  flex-wrap: wrap;
+}
+
+.price-chip {
+  padding: var(--sp-xs) var(--sp-md);
+  border-radius: var(--r-full);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.price-chip.morning {
+  background: var(--morning-bg);
+  color: var(--morning);
+}
+
+.price-chip.afternoon {
+  background: var(--afternoon-bg);
+  color: var(--afternoon);
+}
+
+.price-chip.night {
+  background: var(--night-bg);
+  color: var(--night);
+}
+
+/* Grand Total Card */
+.grand-total-card {
+  background: var(--card);
+  border: 1px solid var(--primary);
+  border-radius: var(--r-xl);
+  padding: var(--sp-xxl);
+  text-align: center;
+  margin-bottom: var(--sp-xl);
+}
+
+.grand-total-label {
+  display: block;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: var(--sp-xs);
+}
+
+.grand-total-value {
+  display: block;
+  color: var(--primary);
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.grand-total-sub {
+  display: block;
+  color: var(--text-dim);
+  font-size: 12px;
+  margin-top: var(--sp-xs);
+}

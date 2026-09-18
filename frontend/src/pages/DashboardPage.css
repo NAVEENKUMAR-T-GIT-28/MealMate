@@ -1,0 +1,130 @@
+.dashboard {
+  max-width: 700px;
+}
+
+/* Date Navigator */
+.date-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--sp-lg);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--sp-lg);
+}
+
+.date-nav-btn {
+  padding: var(--sp-sm);
+  border-radius: var(--r-full);
+  background: var(--card);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  transition: background 0.15s ease;
+}
+
+.date-nav-btn:hover {
+  background: var(--border);
+}
+
+.date-nav-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  padding: var(--sp-xs) var(--sp-lg);
+  border-radius: var(--r-md);
+  transition: background 0.15s ease;
+}
+
+.date-nav-center:hover {
+  background: var(--card);
+}
+
+.date-nav-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.date-nav-hint {
+  color: var(--primary);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+/* Day Stats */
+.day-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-sm);
+  margin-bottom: var(--sp-lg);
+}
+
+.stat-card {
+  background: var(--card);
+  border-radius: var(--r-md);
+  padding: var(--sp-sm) var(--sp-md);
+  text-align: center;
+  border-left: 3px solid;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.stat-emoji {
+  font-size: 16px;
+}
+
+.stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.stat-value.primary {
+  color: var(--primary);
+}
+
+/* Mark All */
+.mark-all-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-sm);
+  background: var(--primary-dark);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  padding: var(--sp-md);
+  border-radius: var(--r-lg);
+  margin-bottom: var(--sp-lg);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.mark-all-btn:hover {
+  background: var(--primary);
+}
+
+.mark-all-btn:active {
+  transform: scale(0.98);
+}
+
+/* Members List */
+.members-list {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 480px) {
+  .day-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

@@ -1,0 +1,72 @@
+.group-switcher {
+  position: relative;
+}
+
+.group-switcher-single,
+.group-switcher-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  padding: var(--sp-sm) var(--sp-md);
+  border-radius: var(--r-md);
+}
+
+.group-switcher-btn {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.group-switcher-btn:hover {
+  background: var(--card);
+}
+
+.group-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.chevron {
+  color: var(--text-dim);
+  transition: transform 0.2s ease;
+}
+
+.chevron.open {
+  transform: rotate(180deg);
+}
+
+.group-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 200px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--sp-xs);
+  z-index: 100;
+  animation: fadeInDown 0.15s ease;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+
+.group-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--sp-md);
+  border-radius: var(--r-sm);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  transition: background 0.1s ease;
+}
+
+.group-option:hover {
+  background: var(--primary-alpha);
+}
+
+.group-option.active {
+  color: var(--primary);
+  font-weight: 700;
+  background: var(--primary-alpha);
+}

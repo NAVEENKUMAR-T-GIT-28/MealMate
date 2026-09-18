@@ -1,0 +1,214 @@
+.settings-page {
+  max-width: 600px;
+}
+
+/* Theme Selector */
+.theme-selector {
+  display: flex;
+  background: var(--card);
+  border-radius: var(--r-lg);
+  padding: 4px;
+  border: 1px solid var(--border);
+  margin-bottom: var(--sp-md);
+}
+
+.theme-option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: var(--sp-md);
+  border-radius: var(--r-md);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dim);
+  transition: all 0.15s ease;
+}
+
+.theme-option:hover {
+  color: var(--text);
+}
+
+.theme-option.active {
+  background: var(--primary);
+  color: #fff;
+}
+
+/* Price Card */
+.price-card {
+  background: var(--card);
+  border-radius: var(--r-xl);
+  padding: var(--sp-lg);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+}
+
+.price-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-md);
+}
+
+.price-label {
+  flex: 1;
+  padding: var(--sp-md);
+  border-radius: var(--r-md);
+  font-weight: 600;
+}
+
+.morning-label { background: var(--morning-bg); color: var(--morning); }
+.afternoon-label { background: var(--afternoon-bg); color: var(--afternoon); }
+.night-label { background: var(--night-bg); color: var(--night); }
+
+.price-input {
+  width: 90px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  padding: var(--sp-md);
+}
+
+.save-price-btn {
+  margin-top: var(--sp-sm);
+}
+
+/* Reports */
+.reports-card {
+  background: var(--card);
+  border-radius: var(--r-xl);
+  padding: var(--sp-lg);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+}
+
+.reports-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.month-picker-wrapper {
+  position: relative;
+}
+
+.month-picker-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--sp-md);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.month-picker-chevron {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.month-picker-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  max-height: 250px;
+  overflow-y: auto;
+  z-index: 50;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  animation: fadeInDown 0.15s ease;
+}
+
+.month-picker-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--sp-md);
+  font-size: 15px;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  text-align: left;
+}
+
+.month-picker-option:last-child {
+  border-bottom: none;
+}
+
+.month-picker-option:hover {
+  background: var(--primary-alpha-light);
+}
+
+.month-picker-option.active {
+  color: var(--primary);
+  font-weight: 700;
+  background: var(--primary-alpha);
+}
+
+.export-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+  margin-top: var(--sp-sm);
+}
+
+.export-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-sm);
+  padding: var(--sp-md);
+  border-radius: var(--r-lg);
+  font-weight: 700;
+  font-size: 15px;
+  color: #fff;
+  transition: filter 0.15s ease;
+}
+
+.export-btn:hover {
+  filter: brightness(1.1);
+}
+
+.export-btn.excel { background: #107c41; }
+.export-btn.pdf { background: #d32f2f; }
+
+/* App Info */
+.app-info {
+  text-align: center;
+  padding: var(--sp-xxl);
+  margin-top: var(--sp-xxxl);
+}
+
+.app-info-name {
+  color: var(--primary);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.app-info-version {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.app-info-desc {
+  color: var(--text-dim);
+  font-size: 12px;
+  max-width: 260px;
+  margin: var(--sp-sm) auto 0;
+  text-align: center;
+}

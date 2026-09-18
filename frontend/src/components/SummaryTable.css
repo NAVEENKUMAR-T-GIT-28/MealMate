@@ -1,0 +1,76 @@
+.summary-table-wrapper {
+  overflow-x: auto;
+  border-radius: var(--r-md);
+}
+
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 480px;
+}
+
+.summary-table th,
+.summary-table td {
+  padding: 12px 10px;
+  text-align: left;
+}
+
+.summary-table thead tr {
+  background: var(--primary-alpha);
+  border-radius: var(--r-md) var(--r-md) 0 0;
+}
+
+.summary-table th {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.summary-table th.morning-col { color: var(--morning); }
+.summary-table th.afternoon-col { color: var(--afternoon); }
+.summary-table th.night-col { color: var(--night); }
+
+.col-name { width: 140px; }
+.col-num { width: 60px; text-align: center; }
+.col-total { width: 100px; text-align: right; }
+.col-chevron { width: 30px; text-align: center; color: var(--text-dim); }
+
+.summary-row {
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+  border-bottom: 1px solid var(--border);
+}
+
+.summary-row:hover {
+  opacity: 0.8;
+}
+
+.summary-row.even {
+  background: var(--card);
+}
+
+.summary-row.odd {
+  background: var(--bg);
+}
+
+.summary-row td {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.total-value {
+  color: var(--primary) !important;
+  font-weight: 600;
+}
+
+.grand-total-row {
+  background: var(--primary-alpha-light);
+  border-bottom-left-radius: var(--r-md);
+  border-bottom-right-radius: var(--r-md);
+}
+
+.grand-total-text {
+  color: var(--primary) !important;
+  font-weight: 700;
+  font-size: 15px;
+}

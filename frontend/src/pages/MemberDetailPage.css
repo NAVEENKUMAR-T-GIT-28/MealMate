@@ -1,0 +1,116 @@
+.member-detail-page {
+  max-width: 700px;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+  margin-bottom: var(--sp-lg);
+  padding-bottom: var(--sp-lg);
+  border-bottom: 1px solid var(--border);
+}
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--text);
+  transition: background 0.15s ease;
+}
+
+.back-btn:hover {
+  background: var(--border);
+}
+
+.detail-header-info h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.detail-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-sm);
+  margin-bottom: var(--sp-xl);
+}
+
+.detail-calendar {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+}
+
+.detail-calendar-header {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  padding: var(--sp-md) var(--sp-lg);
+  background: var(--primary-alpha);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  text-align: center;
+}
+
+.detail-calendar-header span:first-child {
+  text-align: left;
+}
+
+.detail-calendar-body {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.detail-calendar-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  padding: var(--sp-md) var(--sp-lg);
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  text-align: center;
+  font-size: 14px;
+}
+
+.detail-calendar-row:last-child {
+  border-bottom: none;
+}
+
+.detail-calendar-row.future {
+  opacity: 0.4;
+}
+
+.detail-date {
+  text-align: left;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.detail-meal {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--text-dim);
+}
+
+.meal-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.meal-dot.morning { background: var(--morning); }
+.meal-dot.afternoon { background: var(--afternoon); }
+.meal-dot.night { background: var(--night); }
+
+@media (max-width: 480px) {
+  .detail-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
