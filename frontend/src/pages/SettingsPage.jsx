@@ -4,6 +4,8 @@ import { useTheme } from '../context/ThemeContext';
 import { useGroup } from '../context/GroupContext';
 import { pricesApi } from '../api/prices';
 import { formatMonth, todayStr } from '../utils/dateUtils';
+import { exportToPdf } from '../utils/exportPdf';
+import { exportToExcel } from '../utils/exportExcel';
 import './SettingsPage.css';
 
 export default function SettingsPage() {
@@ -16,6 +18,7 @@ export default function SettingsPage() {
   
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
 
   // Simplified month selection since dynamic months requires more API
@@ -72,8 +75,22 @@ export default function SettingsPage() {
     }
   };
 
-  const handleExport = (type) => {
-    alert(`Export ${type.toUpperCase()} for ${formatMonth(selectedMonth)} — will work in future phase`);
+  const handleExport = async (type) => {
+    if (!currentGroup) return;
+    setExporting(true);
+    setError('');
+    try {
+      if (type === 'pdf') {
+        await exportToPdf(currentGroup.id, selectedMonth);
+      } else if (type === 'excel') {
+        await exportToExcel(currentGroup.id, selectedMonth);
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Failed to generate export. Make sure there is data for this month.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const themeOptions = [
@@ -173,13 +190,21 @@ export default function SettingsPage() {
         </div>
 
         <div className="export-row">
-          <button className="export-btn excel" onClick={() => handleExport('excel')}>
+          <button 
+            className="export-btn excel" 
+            onClick={() => handleExport('excel')}
+            disabled={exporting}
+          >
             <FileSpreadsheet size={18} />
-            Export Excel (.xlsx)
+            {exporting ? 'Generating...' : 'Export Excel (.xlsx)'}
           </button>
-          <button className="export-btn pdf" onClick={() => handleExport('pdf')}>
+          <button 
+            className="export-btn pdf" 
+            onClick={() => handleExport('pdf')}
+            disabled={exporting}
+          >
             <FileText size={18} />
-            Export PDF (.pdf)
+            {exporting ? 'Generating...' : 'Export PDF (.pdf)'}
           </button>
         </div>
       </div>

@@ -16,14 +16,21 @@ export default function HistoryPage() {
     if (!currentGroup) return;
     try {
       setLoading(true);
-      // Fetch current month and previous 2 months as a simple history
+      // Fetch months from group creation up to current month (max 24 months to avoid huge requests)
       const current = new Date();
+      const createdDate = currentGroup.created_at ? new Date(currentGroup.created_at) : current;
+      
       const monthsToFetch = [];
-      for (let i = 0; i < 3; i++) {
-        const d = new Date(current.getFullYear(), current.getMonth() - i, 1);
+      let d = new Date(current.getFullYear(), current.getMonth(), 1);
+      const end = new Date(createdDate.getFullYear(), createdDate.getMonth(), 1);
+
+      let maxMonths = 24; 
+      while (d >= end && maxMonths > 0) {
         const y = d.getFullYear();
         const m = String(d.getMonth() + 1).padStart(2, '0');
         monthsToFetch.push(`${y}-${m}`);
+        d.setMonth(d.getMonth() - 1);
+        maxMonths--;
       }
 
       const results = await Promise.all(

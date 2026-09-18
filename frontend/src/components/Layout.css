@@ -35,8 +35,10 @@
   gap: var(--sp-sm);
 }
 
-.logo-icon {
-  font-size: 24px;
+.logo-icon-img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
 }
 
 .logo-text {
@@ -186,8 +188,10 @@
   gap: var(--sp-sm);
 }
 
-.logo-icon-sm {
-  font-size: 20px;
+.logo-icon-sm-img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
 }
 
 .mobile-avatar {

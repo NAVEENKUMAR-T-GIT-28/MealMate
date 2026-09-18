@@ -18,8 +18,10 @@
   margin-bottom: var(--sp-xl);
 }
 
-.group-info-icon {
-  font-size: 40px;
+.group-info-icon-img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
 }
 
 .group-info-name {

@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, Navigate } from 'react-router-dom';
 import { CalendarDays, BarChart3, Clock, Settings, LayoutDashboard, Users, LogOut } from 'lucide-react';
 import GroupSwitcher from './GroupSwitcher';
 import { useAuth } from '../context/AuthContext';
@@ -13,10 +13,60 @@ const NAV_ITEMS = [
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
+function PendingApprovalView({ groupName, onLogout, onCancel }) {
+  return (
+    <div 
+      className="animate-fade-in" 
+      style={{ 
+        display: 'flex', 
+        height: '100vh', 
+        width: '100vw', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        padding: '1.5rem',
+        background: 'var(--bg-body)' 
+      }}
+    >
+      <div style={{ maxWidth: '400px', width: '100%', background: 'var(--surface)', padding: '2rem', borderRadius: '12px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', textAlign: 'center' }}>
+        <img src="/favicon.png" alt="MealMate Logo" style={{ width: '64px', height: '64px', objectFit: 'contain', margin: '0 auto 1rem', display: 'block' }} />
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text)' }}>Waiting for Approval</h2>
+        <p style={{ color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '1.5rem' }}>
+          Your request to join <strong>{groupName}</strong> has been sent to the admin. You will gain access to the dashboard once they admit you.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <button className="btn-secondary" onClick={onLogout} style={{ width: '100%' }}>
+            Log Out
+          </button>
+          <button 
+            onClick={onCancel}
+            style={{ width: '100%', background: 'transparent', border: '1px solid transparent', color: 'var(--color-danger)', padding: '0.75rem', cursor: 'pointer', fontWeight: 500, borderRadius: '8px' }}
+          >
+            Cancel Request
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Layout() {
   const { user, logout } = useAuth();
-  const { isAdmin } = useGroup();
+  const { isAdmin, groups, currentGroup, loading, isPending, cancelRequest } = useGroup();
   const location = useLocation();
+
+  if (!loading && groups.length === 0) {
+    return <Navigate to="/groups" replace />;
+  }
+
+  if (isPending) {
+    return (
+      <PendingApprovalView 
+        groupName={currentGroup?.name || 'the group'} 
+        onLogout={logout} 
+        onCancel={cancelRequest} 
+      />
+    );
+  }
 
   return (
     <div className="layout">
@@ -24,7 +74,7 @@ export default function Layout() {
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="sidebar-logo">
-            <span className="logo-icon">🍲</span>
+            <img src="/favicon.png" alt="MealMate Logo" className="logo-icon-img" />
             <span className="logo-text">MealMate</span>
           </div>
           <span className="logo-version">v2.0</span>
@@ -86,7 +136,7 @@ export default function Layout() {
         {/* Mobile header */}
         <header className="mobile-header">
           <div className="mobile-header-left">
-            <span className="logo-icon-sm">🍲</span>
+            <img src="/favicon.png" alt="MealMate Logo" className="logo-icon-sm-img" />
             <GroupSwitcher />
           </div>
           <div

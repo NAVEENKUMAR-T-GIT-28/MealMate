@@ -5,8 +5,8 @@ export const groupsApi = {
     const response = await client.get('/groups');
     return response.data;
   },
-  createGroup: async (name) => {
-    const response = await client.post('/groups', { name });
+  createGroup: async (name, prices) => {
+    const response = await client.post('/groups', { name, prices });
     return response.data;
   },
   joinGroup: async (inviteCode) => {
@@ -23,6 +23,14 @@ export const groupsApi = {
   },
   removeMember: async (groupId, userId) => {
     const response = await client.delete(`/groups/${groupId}/members/${userId}`);
+    return response.data;
+  },
+  admitMember: async (groupId, userId) => {
+    const response = await client.put(`/groups/${groupId}/members/${userId}/admit`);
+    return response.data;
+  },
+  cancelJoinRequest: async (groupId) => {
+    const response = await client.delete(`/groups/${groupId}/cancel-request`);
     return response.data;
   }
 };

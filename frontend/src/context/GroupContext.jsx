@@ -68,19 +68,31 @@ export function GroupProvider({ children }) {
     if (group) setCurrentGroup(group);
   };
 
-  const createGroup = async (name) => {
-    const newGroup = await groupsApi.createGroup(name);
+  const createGroup = async (name, prices) => {
+    const newGroup = await groupsApi.createGroup(name, prices);
     await fetchGroups();
-    setCurrentGroup(newGroup);
     return newGroup;
   };
 
   const joinGroup = async (inviteCode) => {
     const data = await groupsApi.joinGroup(inviteCode);
     await fetchGroups();
-    setCurrentGroup(data.group);
     return data;
   };
+
+  const admitMember = async (userId) => {
+    if (!currentGroup) return;
+    await groupsApi.admitMember(currentGroup.id, userId);
+    await fetchMembers();
+  };
+
+  const cancelRequest = async () => {
+    if (!currentGroup) return;
+    await groupsApi.cancelJoinRequest(currentGroup.id);
+    await fetchGroups(); // Fetches groups, currentGroup will be updated (likely null)
+  };
+
+  const isPending = currentGroup?.role === 'pending';
 
   return (
     <GroupContext.Provider value={{
@@ -93,9 +105,12 @@ export function GroupProvider({ children }) {
       switchGroup,
       createGroup,
       joinGroup,
+      admitMember,
+      cancelRequest,
       refreshGroups: fetchGroups,
       refreshMembers: fetchMembers,
-      loading
+      loading,
+      isPending
     }}>
       {children}
     </GroupContext.Provider>

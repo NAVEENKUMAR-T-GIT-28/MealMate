@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { Plus, UserPlus, Hash, ArrowRight } from 'lucide-react';
 import { useGroup } from '../context/GroupContext';
 import './GroupGatePage.css';
@@ -9,16 +9,29 @@ export default function GroupGatePage() {
   const [mode, setMode] = useState(null); // 'create' | 'join'
   const [groupName, setGroupName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  
+  const [morningPrice, setMorningPrice] = useState('');
+  const [afternoonPrice, setAfternoonPrice] = useState('');
+  const [nightPrice, setNightPrice] = useState('');
 
-  const { createGroup, joinGroup } = useGroup();
+  const { createGroup, joinGroup, groups, loading } = useGroup();
   const [error, setError] = useState('');
+
+  if (!loading && groups && groups.length > 0) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const handleCreate = async (e) => {
     e.preventDefault();
     setError('');
     if (!groupName.trim()) return;
     try {
-      await createGroup(groupName);
+      const prices = {
+        morning: Number(morningPrice) || 0,
+        afternoon: Number(afternoonPrice) || 0,
+        night: Number(nightPrice) || 0,
+      };
+      await createGroup(groupName, prices);
       navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create group');
@@ -41,7 +54,7 @@ export default function GroupGatePage() {
     <div className="gate-page">
       <div className="gate-container animate-scale-in">
         <div className="gate-header">
-          <span className="gate-icon">🍲</span>
+          <img src="/favicon.png" alt="MealMate Logo" style={{ width: '64px', height: '64px', objectFit: 'contain', marginBottom: '16px' }} />
           <h1>Get Started</h1>
           <p>Create a new group or join an existing one with an invite code.</p>
         </div>
@@ -83,6 +96,45 @@ export default function GroupGatePage() {
                 required
               />
             </div>
+            <div style={{ marginBottom: '8px', fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>
+              Initial Meal Prices (₹)
+            </div>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '1rem' }}>
+              <div className="input-group" style={{ marginBottom: 0, flex: 1 }}>
+                <span className="input-icon" style={{ fontSize: '14px' }}>☀️</span>
+                <input
+                  type="number"
+                  placeholder="Morning"
+                  value={morningPrice}
+                  onChange={(e) => setMorningPrice(e.target.value)}
+                  style={{ paddingLeft: '32px' }}
+                  required
+                />
+              </div>
+              <div className="input-group" style={{ marginBottom: 0, flex: 1 }}>
+                <span className="input-icon" style={{ fontSize: '14px' }}>🌤️</span>
+                <input
+                  type="number"
+                  placeholder="Afternoon"
+                  value={afternoonPrice}
+                  onChange={(e) => setAfternoonPrice(e.target.value)}
+                  style={{ paddingLeft: '32px' }}
+                  required
+                />
+              </div>
+              <div className="input-group" style={{ marginBottom: 0, flex: 1 }}>
+                <span className="input-icon" style={{ fontSize: '14px' }}>🌙</span>
+                <input
+                  type="number"
+                  placeholder="Night"
+                  value={nightPrice}
+                  onChange={(e) => setNightPrice(e.target.value)}
+                  style={{ paddingLeft: '32px' }}
+                  required
+                />
+              </div>
+            </div>
+
             <div className="gate-form-actions">
               <button type="button" className="btn-secondary" onClick={() => setMode(null)}>
                 Back
