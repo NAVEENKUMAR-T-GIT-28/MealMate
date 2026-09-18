@@ -1,6 +1,6 @@
 import express from 'express';
-import { createGroup, joinGroup, getMyGroups, getGroupMembers } from '../controllers/groups.controller.js';
-import { requireAuth, requireGroupMember } from '../middleware/auth.js';
+import { createGroup, joinGroup, getMyGroups, getGroupMembers, updateMemberStatus, removeMember } from '../controllers/groups.controller.js';
+import { requireAuth, requireGroupMember, requireGroupAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -11,5 +11,7 @@ router.post('/', createGroup);
 router.post('/join', joinGroup);
 router.get('/', getMyGroups);
 router.get('/:groupId/members', requireGroupMember, getGroupMembers);
+router.put('/:groupId/members/:userId/status', requireGroupMember, requireGroupAdmin, updateMemberStatus);
+router.delete('/:groupId/members/:userId', requireGroupMember, requireGroupAdmin, removeMember);
 
 export default router;

@@ -88,3 +88,29 @@ export const getMe = async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 };
+
+export const updateMe = async (req, res) => {
+  const { full_name } = req.body;
+
+  if (!full_name) {
+    return res.status(400).json({ error: 'Full name is required' });
+  }
+
+  try {
+    const { data: user, error } = await supabase
+      .from('users')
+      .update({ full_name })
+      .eq('id', req.user.id)
+      .select('id, full_name, email')
+      .single();
+
+    if (error || !user) {
+      return res.status(404).json({ error: 'Failed to update user profile' });
+    }
+
+    res.json({ user });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error updating profile' });
+  }
+};

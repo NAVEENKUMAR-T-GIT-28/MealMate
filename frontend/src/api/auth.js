@@ -12,5 +12,9 @@ export const authApi = {
   getMe: async () => {
     const response = await client.get('/auth/me');
     return response.data;
+  },
+  updateProfile: async (fullName) => {
+    const response = await client.put('/auth/me', { full_name: fullName });
+    return response.data;
   }
 };

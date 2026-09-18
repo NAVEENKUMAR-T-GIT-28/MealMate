@@ -1,12 +1,92 @@
 import { useState } from 'react';
-import { Copy, RefreshCw, UserMinus, UserPlus, Shield } from 'lucide-react';
+import { Copy, RefreshCw, UserMinus, UserPlus, Shield, Edit2, Power, Trash2 } from 'lucide-react';
 import { useGroup } from '../context/GroupContext';
+import { useAuth } from '../context/AuthContext';
+import { groupsApi } from '../api/groups';
 import { avatarColor, formatDateDisplay } from '../utils/dateUtils';
 import './GroupSettingsPage.css';
 
 export default function GroupSettingsPage() {
-  const { currentGroup, allMembers, isAdmin } = useGroup();
+  const { currentGroup, allMembers, isAdmin, refreshMembers } = useGroup();
+  const { user, updateProfile } = useAuth();
   const [copied, setCopied] = useState(false);
+
+  const [modalConfig, setModalConfig] = useState(null);
+  const [modalInput, setModalInput] = useState('');
+
+  const closeModal = () => {
+    setModalConfig(null);
+    setModalInput('');
+  };
+
+  const handleEditName = (currentName) => {
+    setModalInput(currentName);
+    setModalConfig({
+      type: 'edit_name',
+      title: 'Edit Your Name',
+      confirmText: 'Save',
+      originalName: currentName
+    });
+  };
+
+  const handleToggleStatus = (memberId, currentStatus) => {
+    setModalConfig({
+      type: 'confirm',
+      action: 'toggle_status',
+      memberId,
+      currentStatus,
+      title: 'Update Status',
+      message: `Are you sure you want to mark this member as ${currentStatus ? 'inactive' : 'active'}?`,
+      confirmText: currentStatus ? 'Make Inactive' : 'Make Active',
+      isDanger: currentStatus
+    });
+  };
+
+  const handleRemoveMember = (memberId) => {
+    setModalConfig({
+      type: 'confirm',
+      action: 'remove_member',
+      memberId,
+      title: 'Remove Member',
+      message: 'Are you sure you want to completely remove this member from the group? This action cannot be undone.',
+      confirmText: 'Remove',
+      isDanger: true
+    });
+  };
+
+  const confirmModalAction = async () => {
+    if (!modalConfig) return;
+
+    if (modalConfig.type === 'edit_name') {
+      if (modalInput.trim() !== "" && modalInput !== modalConfig.originalName) {
+        const res = await updateProfile(modalInput.trim());
+        if (res.success) {
+          refreshMembers();
+          closeModal();
+        } else {
+          alert(res.error || "Failed to update name");
+        }
+      } else {
+        closeModal();
+      }
+    } else if (modalConfig.action === 'toggle_status') {
+      try {
+        await groupsApi.updateMemberStatus(currentGroup.id, modalConfig.memberId, !modalConfig.currentStatus);
+        refreshMembers();
+        closeModal();
+      } catch (err) {
+        alert("Failed to update status");
+      }
+    } else if (modalConfig.action === 'remove_member') {
+      try {
+        await groupsApi.removeMember(currentGroup.id, modalConfig.memberId);
+        refreshMembers();
+        closeModal();
+      } catch (err) {
+        alert("Failed to remove member");
+      }
+    }
+  };
 
   const handleCopyCode = () => {
     navigator.clipboard?.writeText(currentGroup?.invite_code || '');
@@ -110,10 +190,67 @@ export default function GroupSettingsPage() {
               <span className={`badge ${member.is_active ? 'badge-active' : 'badge-inactive'}`}>
                 {member.is_active ? 'Active' : 'Inactive'}
               </span>
+
+              <div className="member-actions">
+                {member.user_id === user?.id && (
+                  <button className="action-btn edit-btn" onClick={() => handleEditName(member.name)} title="Edit your name">
+                    <Edit2 size={16} />
+                  </button>
+                )}
+                
+                {isAdmin && member.user_id !== user?.id && (
+                  <>
+                    <button 
+                      className={`action-btn ${member.is_active ? 'power-btn' : 'power-btn-inactive'}`} 
+                      onClick={() => handleToggleStatus(member.user_id, member.is_active)}
+                      title={member.is_active ? "Make Inactive" : "Make Active"}
+                    >
+                      <Power size={16} />
+                    </button>
+                    <button className="action-btn remove-btn" onClick={() => handleRemoveMember(member.user_id)} title="Remove from group">
+                      <Trash2 size={16} />
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         ))}
       </div>
+
+      {/* Custom Modal */}
+      {modalConfig && (
+        <div className="modal-overlay" onClick={closeModal}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h3 className="modal-title">{modalConfig.title}</h3>
+            
+            {modalConfig.type === 'edit_name' ? (
+              <input
+                type="text"
+                className="modal-input"
+                value={modalInput}
+                onChange={e => setModalInput(e.target.value)}
+                autoFocus
+                onKeyDown={e => e.key === 'Enter' && confirmModalAction()}
+              />
+            ) : (
+              <p className="modal-body">{modalConfig.message}</p>
+            )}
+
+            <div className="modal-actions">
+              <button className="modal-btn modal-btn-cancel" onClick={closeModal}>
+                Cancel
+              </button>
+              <button 
+                className={`modal-btn ${modalConfig.isDanger ? 'modal-btn-danger' : 'modal-btn-confirm'}`}
+                onClick={confirmModalAction}
+              >
+                {modalConfig.confirmText || 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

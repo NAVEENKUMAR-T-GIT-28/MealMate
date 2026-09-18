@@ -152,3 +152,46 @@ export const getGroupMembers = async (req, res) => {
     res.status(500).json({ error: 'Server error fetching members' });
   }
 };
+
+export const updateMemberStatus = async (req, res) => {
+  const { groupId, userId } = req.params;
+  const { is_active } = req.body;
+
+  if (is_active === undefined) {
+    return res.status(400).json({ error: 'is_active is required' });
+  }
+
+  try {
+    const { error } = await supabase
+      .from('group_members')
+      .update({ is_active })
+      .eq('group_id', groupId)
+      .eq('user_id', userId);
+
+    if (error) throw error;
+
+    res.json({ message: `Member marked as ${is_active ? 'active' : 'inactive'}` });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error updating member status' });
+  }
+};
+
+export const removeMember = async (req, res) => {
+  const { groupId, userId } = req.params;
+
+  try {
+    const { error } = await supabase
+      .from('group_members')
+      .delete()
+      .eq('group_id', groupId)
+      .eq('user_id', userId);
+
+    if (error) throw error;
+
+    res.json({ message: 'Member removed from group' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error removing member' });
+  }
+};

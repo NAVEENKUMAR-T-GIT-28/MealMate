@@ -63,10 +63,23 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  const updateProfile = async (fullName) => {
+    try {
+      const data = await authApi.updateProfile(fullName);
+      setUser(data.user);
+      return { success: true };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error.response?.data?.error || 'Failed to update profile' 
+      };
+    }
+  };
+
   const isAuthenticated = !!user && !!token;
 
   return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated, loading, login, signup, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );
