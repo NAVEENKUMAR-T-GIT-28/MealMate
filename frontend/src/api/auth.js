@@ -16,5 +16,9 @@ export const authApi = {
   updateProfile: async (fullName) => {
     const response = await client.put('/auth/me', { full_name: fullName });
     return response.data;
+  },
+  logout: async () => {
+    const response = await client.post('/auth/logout');
+    return response.data;
   }
 };

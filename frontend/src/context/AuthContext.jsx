@@ -5,33 +5,27 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token') || null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const initAuth = async () => {
-      if (token) {
-        try {
-          const data = await authApi.getMe();
-          setUser(data.user);
-        } catch (error) {
-          console.error("Auth init error:", error);
-          // Token might be invalid/expired
-          localStorage.removeItem('token');
-          setToken(null);
-          setUser(null);
-        }
+      try {
+        const data = await authApi.getMe();
+        setUser(data.user);
+      } catch (error) {
+        // No valid session cookie found or expired
+        setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     initAuth();
-  }, [token]);
+  }, []);
 
   const login = async (email, password) => {
     try {
       const data = await authApi.login(email, password);
-      localStorage.setItem('token', data.token);
-      setToken(data.token);
+      // Backend automatically set the HttpOnly cookie
       setUser(data.user);
       return { success: true };
     } catch (error) {
@@ -45,8 +39,7 @@ export function AuthProvider({ children }) {
   const signup = async (fullName, email, password) => {
     try {
       const data = await authApi.signup(fullName, email, password);
-      localStorage.setItem('token', data.token);
-      setToken(data.token);
+      // Backend automatically set the HttpOnly cookie
       setUser(data.user);
       return { success: true };
     } catch (error) {
@@ -57,10 +50,14 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    setToken(null);
-    setUser(null);
+  const logout = async () => {
+    try {
+      await authApi.logout();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setUser(null);
+    }
   };
 
   const updateProfile = async (fullName) => {
@@ -76,10 +73,10 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const isAuthenticated = !!user && !!token;
+  const isAuthenticated = !!user;
 
   return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated, loading, login, signup, logout, updateProfile }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, loading, login, signup, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

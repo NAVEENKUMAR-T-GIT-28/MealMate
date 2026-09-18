@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import authRoutes from './routes/auth.routes.js';
 import groupRoutes from './routes/groups.routes.js';
 import attendanceRoutes from './routes/attendance.routes.js';
@@ -9,8 +11,17 @@ import summaryRoutes from './routes/summary.routes.js';
 const app = express();
 
 // Middleware
-app.use(cors());
+// Helmet for HTTP headers
+app.use(helmet());
+
+// CORS config allowing credentials for HttpOnly cookies
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true
+}));
+
 app.use(express.json());
+app.use(cookieParser());
 
 // Routes
 app.use('/api/auth', authRoutes);

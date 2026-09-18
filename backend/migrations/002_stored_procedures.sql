@@ -1,3 +1,6 @@
+-- 002_stored_procedures.sql
+
+-- 1. RPC: Get Monthly Summary
 CREATE OR REPLACE FUNCTION get_monthly_summary(p_group_id INT, p_month TEXT)
 RETURNS TABLE (
   user_id INT,
@@ -63,5 +66,34 @@ BEGIN
   WHERE gm.group_id = p_group_id AND gm.is_active = true AND gm.role != 'pending'
   GROUP BY u.id, u.full_name
   ORDER BY u.full_name ASC;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- 2. RPC: Toggle Attendance
+CREATE OR REPLACE FUNCTION toggle_attendance(
+  p_group_id INT,
+  p_user_id INT,
+  p_date DATE,
+  p_meal_type TEXT
+) RETURNS setof attendance AS $$
+BEGIN
+  RETURN QUERY
+  INSERT INTO attendance (group_id, user_id, date, morning, afternoon, night, updated_at)
+  VALUES (
+    p_group_id, 
+    p_user_id, 
+    p_date, 
+    (p_meal_type = 'morning'), 
+    (p_meal_type = 'afternoon'), 
+    (p_meal_type = 'night'),
+    NOW()
+  )
+  ON CONFLICT (group_id, user_id, date) DO UPDATE SET
+    morning = CASE WHEN p_meal_type = 'morning' THEN NOT attendance.morning ELSE attendance.morning END,
+    afternoon = CASE WHEN p_meal_type = 'afternoon' THEN NOT attendance.afternoon ELSE attendance.afternoon END,
+    night = CASE WHEN p_meal_type = 'night' THEN NOT attendance.night ELSE attendance.night END,
+    updated_at = NOW()
+  RETURNING *;
 END;
 $$ LANGUAGE plpgsql;

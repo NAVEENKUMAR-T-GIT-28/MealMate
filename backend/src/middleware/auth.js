@@ -3,12 +3,20 @@ import supabase from '../config/db.js';
 
 // 1. Authenticate User
 export const requireAuth = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Unauthorized: Missing or invalid token' });
+  let token;
+
+  // Check cookies first
+  if (req.cookies && req.cookies.jwt) {
+    token = req.cookies.jwt;
+  } 
+  // Fallback to Bearer token (for future mobile app)
+  else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    token = req.headers.authorization.split(' ')[1];
   }
 
-  const token = authHeader.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized: Missing or invalid token' });
+  }
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
     req.user = payload; // { id, email }

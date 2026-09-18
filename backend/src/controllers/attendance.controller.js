@@ -57,43 +57,20 @@ export const toggleAttendance = async (req, res) => {
   }
 
   try {
-    // 1. Get current row or default
-    const { data: existing, error: fetchError } = await supabase
-      .from('attendance')
-      .select('*')
-      .eq('group_id', group_id)
-      .eq('user_id', effectiveUserId)
-      .eq('date', date)
-      .single();
+    const { data: result, error } = await supabase.rpc('toggle_attendance', {
+      p_group_id: group_id,
+      p_user_id: effectiveUserId,
+      p_date: date,
+      p_meal_type: meal_type
+    });
 
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      // PGRST116 is "No rows found"
-      throw fetchError;
+    if (error) {
+      console.error('RPC Error:', error);
+      throw error;
     }
 
-    // 2. Upsert with toggled value
-    const updatePayload = {
-      group_id,
-      user_id: effectiveUserId,
-      date,
-      morning: existing ? existing.morning : false,
-      afternoon: existing ? existing.afternoon : false,
-      night: existing ? existing.night : false,
-      updated_at: new Date().toISOString()
-    };
-
-    updatePayload[meal_type] = existing ? !existing[meal_type] : true;
-
-    // Use upsert on composite key (which requires a unique constraint in DB, which we have)
-    const { data: result, error: upsertError } = await supabase
-      .from('attendance')
-      .upsert(updatePayload, { onConflict: 'group_id,user_id,date' })
-      .select('*')
-      .single();
-
-    if (upsertError) throw upsertError;
-
-    res.json(result);
+    // The RPC returns a setof attendance, we want the first (and only) row
+    res.json(result[0] || result);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error updating attendance' });
