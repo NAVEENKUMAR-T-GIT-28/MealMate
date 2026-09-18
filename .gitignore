@@ -28,10 +28,10 @@ pnpm-debug.log
 # =========================
 # Frontend (Web / React / Vite)
 # =========================
-frontend/dist/
-frontend/build/
-frontend/.next/
-frontend/out/
+web/dist/
+web/build/
+web/.next/
+web/out/
 
 # Catch-all for generic build outputs
 dist/
@@ -41,8 +41,8 @@ out/
 # =========================
 # Backend (Express / Node)
 # =========================
-backend/uploads/
-backend/dist/
+server/uploads/
+server/dist/
 *.sqlite3
 *.db
 
@@ -50,26 +50,26 @@ backend/dist/
 # App (React Native / Expo)
 # =========================
 # Expo specific
-.expo/
-app/.expo/
-app/web-build/
+mobile/.expo/
+mobile/app/.expo/
+mobile/app/web-build/
 
 # Android
-app/android/app/build/
-app/android/.gradle/
-app/android/local.properties
-app/android/build/
-app/android/app/src/main/assets/
+mobile/android/app/build/
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/build/
+mobile/android/app/src/main/assets/
 
 # iOS
-app/ios/Pods/
-app/ios/build/
-app/ios/*.xcworkspace/xcuserdata/
-app/ios/*.xcodeproj/project.xcworkspace/xcuserdata/
-app/ios/DerivedData/
+mobile/ios/Pods/
+mobile/ios/build/
+mobile/ios/*.xcworkspace/xcuserdata/
+mobile/ios/*.xcodeproj/project.xcworkspace/xcuserdata/
+mobile/ios/DerivedData/
 
 # Ruby / CocoaPods
-app/vendor/bundle/
+mobile/vendor/bundle/
 
 # React Native specific caches
 .eslintcache
