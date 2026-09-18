@@ -217,3 +217,27 @@
   align-items: center;
   gap: 4px;
 }
+
+@media (max-width: 480px) {
+  .invite-code {
+    font-size: 22px;
+    letter-spacing: 2px;
+  }
+  .invite-btn {
+    padding: 6px 10px;
+  }
+  .group-info-name {
+    font-size: 18px;
+  }
+  .group-info-card, .group-stat, .group-member-card {
+    padding: var(--sp-md);
+  }
+  .group-member-name {
+    display: inline-block;
+    max-width: 120px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+  }
+}

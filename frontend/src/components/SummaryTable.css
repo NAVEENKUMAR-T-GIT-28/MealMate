@@ -74,3 +74,36 @@
   font-weight: 700;
   font-size: 15px;
 }
+
+@media (max-width: 480px) {
+  .summary-table {
+    min-width: 100%;
+  }
+  .col-name { 
+    width: auto; 
+    max-width: 110px; 
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis; 
+  }
+  .col-num { width: 40px; }
+  .col-total { width: auto; white-space: nowrap; }
+  .col-chevron { width: 20px; padding-left: 2px !important; padding-right: 2px !important; }
+  
+  .summary-table th,
+  .summary-table td {
+    padding: 10px 4px;
+  }
+  
+  .summary-table th {
+    font-size: 11px;
+  }
+  
+  .summary-row td {
+    font-size: 13px;
+  }
+  
+  .grand-total-text {
+    font-size: 13px;
+  }
+}

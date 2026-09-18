@@ -126,5 +126,15 @@
 @media (max-width: 480px) {
   .day-stats {
     grid-template-columns: repeat(2, 1fr);
+    gap: var(--sp-xs);
+  }
+  .date-nav-text {
+    font-size: 14px;
+  }
+  .stat-value {
+    font-size: 16px;
+  }
+  .mark-all-btn {
+    padding: 10px;
   }
 }

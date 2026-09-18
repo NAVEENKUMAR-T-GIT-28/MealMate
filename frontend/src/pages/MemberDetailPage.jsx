@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import MonthNavigator from '../components/MonthNavigator';
@@ -15,7 +15,8 @@ export default function MemberDetailPage() {
   const { memberId } = useParams();
   const navigate = useNavigate();
   const { currentGroup, allMembers } = useGroup();
-  const [month, setMonth] = useState(currentMonthStr());
+  const location = useLocation();
+  const [month, setMonth] = useState(location.state?.month || currentMonthStr());
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -59,7 +60,7 @@ export default function MemberDetailPage() {
       <div className="empty-state">
         <span style={{ fontSize: 64 }}>🤔</span>
         <h3>Member Not Found</h3>
-        <button className="btn-secondary" onClick={() => navigate('/summary')}>
+        <button className="btn-secondary" onClick={() => navigate('/summary', { state: { month } })}>
           Back to Summary
         </button>
       </div>
@@ -81,7 +82,7 @@ export default function MemberDetailPage() {
   return (
     <div className="member-detail-page">
       <div className="detail-header animate-fade-in">
-        <button className="back-btn" onClick={() => navigate('/summary')}>
+        <button className="back-btn" onClick={() => navigate('/summary', { state: { month } })}>
           <ArrowLeft size={20} />
         </button>
         <div className="detail-header-info">

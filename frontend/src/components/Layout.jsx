@@ -8,7 +8,6 @@ import './Layout.css';
 
 const NAV_ITEMS = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Today' },
-  { to: '/attendance', icon: CalendarDays, label: 'Attendance' },
   { to: '/summary', icon: BarChart3, label: 'Summary' },
   { to: '/history', icon: Clock, label: 'History' },
   { to: '/settings', icon: Settings, label: 'Settings' },
@@ -117,6 +116,17 @@ export default function Layout() {
             <span>{item.label}</span>
           </NavLink>
         ))}
+        {isAdmin && (
+          <NavLink
+            to="/group-settings"
+            className={({ isActive }) =>
+              `bottom-tab ${isActive ? 'active' : ''}`
+            }
+          >
+            <Users size={22} />
+            <span>Group</span>
+          </NavLink>
+        )}
       </nav>
     </div>
   );

@@ -212,3 +212,16 @@
   margin: var(--sp-sm) auto 0;
   text-align: center;
 }
+
+@media (max-width: 480px) {
+  .price-card, .reports-card {
+    padding: var(--sp-md);
+  }
+  .price-input {
+    width: 70px;
+  }
+  .theme-option {
+    padding: var(--sp-sm);
+    font-size: 12px;
+  }
+}

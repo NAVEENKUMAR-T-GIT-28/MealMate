@@ -190,3 +190,21 @@
   font-weight: 600;
   color: var(--text);
 }
+
+@media (max-width: 480px) {
+  .year-card {
+    padding: var(--sp-md);
+  }
+  .expanded-content {
+    padding: 0 var(--sp-md) var(--sp-md);
+  }
+  .year-title {
+    font-size: 18px;
+  }
+  .month-name {
+    font-size: 14px;
+  }
+  .spending-section {
+    padding: var(--sp-sm) 0;
+  }
+}

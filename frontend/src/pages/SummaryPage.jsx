@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import MonthNavigator from '../components/MonthNavigator';
 import SummaryTable from '../components/SummaryTable';
 import { useGroup } from '../context/GroupContext';
@@ -13,8 +13,9 @@ import './SummaryPage.css';
 export default function SummaryPage() {
   const { currentGroup } = useGroup();
   const navigate = useNavigate();
+  const location = useLocation();
   
-  const [month, setMonth] = useState(currentMonthStr());
+  const [month, setMonth] = useState(location.state?.month || currentMonthStr());
   const [summary, setSummary] = useState({ members: [], grandTotal: 0 });
   const [currentPrices, setCurrentPrices] = useState({ morning: 0, afternoon: 0, night: 0 });
   const [loading, setLoading] = useState(false);
@@ -93,7 +94,7 @@ export default function SummaryPage() {
             members={summary.members}
             grandTotal={summary.grandTotal}
             onMemberPress={(memberId) =>
-              navigate(`/summary/${memberId}`)
+              navigate(`/summary/${memberId}`, { state: { month } })
             }
           />
         </div>

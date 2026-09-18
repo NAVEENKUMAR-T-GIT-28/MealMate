@@ -113,4 +113,18 @@
   .detail-stats {
     grid-template-columns: repeat(2, 1fr);
   }
+  .detail-calendar-header,
+  .detail-calendar-row {
+    padding: var(--sp-sm) var(--sp-md);
+    font-size: 12px;
+  }
+  .detail-date {
+    font-size: 12px;
+  }
+  .detail-header-info h2 {
+    font-size: 18px;
+  }
+  .stat-value {
+    font-size: 16px;
+  }
 }

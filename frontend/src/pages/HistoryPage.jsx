@@ -72,9 +72,13 @@ export default function HistoryPage() {
     return list;
   })();
 
-  const [expandedYears, setExpandedYears] = useState(
-    new Set(years.length > 0 ? [years[0].year] : [])
-  );
+  const [expandedYears, setExpandedYears] = useState(null);
+
+  useEffect(() => {
+    if (expandedYears === null && years.length > 0) {
+      setExpandedYears(new Set([years[0].year]));
+    }
+  }, [years, expandedYears]);
 
   const maxSpend = (() => {
     let max = 0;
@@ -84,7 +88,7 @@ export default function HistoryPage() {
 
   const toggleYear = (year) => {
     setExpandedYears(prev => {
-      const next = new Set(prev);
+      const next = new Set(prev || []);
       next.has(year) ? next.delete(year) : next.add(year);
       return next;
     });
@@ -107,7 +111,7 @@ export default function HistoryPage() {
   return (
     <div className="history-page">
       {years.map((yearData, yi) => {
-        const expanded = expandedYears.has(yearData.year) || expandedYears.size === 0;
+        const expanded = expandedYears ? expandedYears.has(yearData.year) : false;
         return (
           <div key={yearData.year} className="animate-fade-in-down" style={{ animationDelay: `${yi * 100}ms` }}>
             {/* Year Card */}
@@ -160,7 +164,7 @@ export default function HistoryPage() {
                   <button
                     key={m.month}
                     className="month-card"
-                    onClick={() => navigate(`/summary`)}
+                    onClick={() => navigate(`/summary`, { state: { month: m.month } })}
                   >
                     <div className="month-left">
                       <div className="month-dot" />

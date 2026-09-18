@@ -163,9 +163,13 @@ export default function SettingsPage() {
       <div className="reports-card animate-fade-in-down delay-5">
         <label className="reports-label">Select Month</label>
         <div className="month-picker-wrapper">
-          <div className="month-picker-btn" style={{cursor: 'default', backgroundColor: 'var(--bg-secondary)'}}>
-            <span>{formatMonth(selectedMonth)}</span>
-          </div>
+          <input
+            type="month"
+            className="month-picker-btn"
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            style={{ cursor: 'pointer', fontFamily: 'inherit' }}
+          />
         </div>
 
         <div className="export-row">
