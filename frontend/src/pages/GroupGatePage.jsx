@@ -1,14 +1,17 @@
 import { useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate, useSearchParams } from 'react-router-dom';
 import { Plus, UserPlus, Hash, ArrowRight } from 'lucide-react';
 import { useGroup } from '../context/GroupContext';
 import './GroupGatePage.css';
 
 export default function GroupGatePage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState(null); // 'create' | 'join'
+  const [searchParams] = useSearchParams();
+  const codeParam = searchParams.get('code');
+
+  const [mode, setMode] = useState(codeParam ? 'join' : null); // 'create' | 'join'
   const [groupName, setGroupName] = useState('');
-  const [inviteCode, setInviteCode] = useState('');
+  const [inviteCode, setInviteCode] = useState(codeParam || '');
   
   const [morningPrice, setMorningPrice] = useState('');
   const [afternoonPrice, setAfternoonPrice] = useState('');

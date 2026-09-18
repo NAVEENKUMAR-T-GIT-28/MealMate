@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, Navigate } from 'react-router-dom';
+import { Link, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { LogIn, Mail, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './AuthPages.css';
@@ -10,9 +10,12 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const from = location.state?.from?.pathname + (location.state?.from?.search || '') || '/dashboard';
 
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={from} replace />;
   }
 
   const handleSubmit = async (e) => {
@@ -20,7 +23,7 @@ export default function LoginPage() {
     setError('');
     const result = await login(email, password);
     if (result.success) {
-      navigate('/dashboard');
+      navigate(from, { replace: true });
     } else {
       setError(result.error);
     }
@@ -30,7 +33,7 @@ export default function LoginPage() {
     <div className="auth-page">
       <div className="auth-card animate-scale-in">
         <div className="auth-logo">
-          <span className="auth-logo-icon">🍲</span>
+          <img src="/favicon.png" alt="MealMate Logo" className="auth-logo-icon" style={{ width: '48px', height: '48px', objectFit: 'contain', margin: '0 auto 1rem', display: 'block' }} />
           <h1 className="auth-logo-text">MealMate</h1>
           <p className="auth-logo-sub">Track meals. Split costs. Stay fair.</p>
         </div>

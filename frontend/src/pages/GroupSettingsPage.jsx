@@ -10,6 +10,7 @@ export default function GroupSettingsPage() {
   const { currentGroup, allMembers, isAdmin, refreshMembers, admitMember } = useGroup();
   const { user, updateProfile } = useAuth();
   const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const pendingMembers = allMembers.filter(m => m.role === 'pending');
   const regularMembers = allMembers.filter(m => m.role !== 'pending');
@@ -118,6 +119,13 @@ export default function GroupSettingsPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleCopyLink = () => {
+    const link = `${window.location.origin}/groups?code=${currentGroup?.invite_code}`;
+    navigator.clipboard?.writeText(link);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
+
   const activeCount = regularMembers.filter(m => m.is_active).length;
 
   return (
@@ -141,17 +149,12 @@ export default function GroupSettingsPage() {
             <div className="invite-code">{currentGroup?.invite_code}</div>
             <button className="invite-btn" onClick={handleCopyCode} title="Copy code">
               <Copy size={16} />
-              {copied ? 'Copied!' : 'Copy'}
+              {copied ? 'Copied!' : 'Code'}
             </button>
-            {isAdmin && (
-              <button
-                className="invite-btn regenerate"
-                onClick={() => alert('Regenerate — will work in Phase 3')}
-                title="Regenerate code"
-              >
-                <RefreshCw size={16} />
-              </button>
-            )}
+            <button className="invite-btn" onClick={handleCopyLink} title="Copy invite link">
+              <Copy size={16} />
+              {linkCopied ? 'Copied!' : 'Link'}
+            </button>
           </div>
           <p className="invite-hint">
             Share this code with others to let them join your group
