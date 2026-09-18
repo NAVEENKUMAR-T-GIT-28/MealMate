@@ -60,7 +60,7 @@ BEGIN
   FROM group_members gm
   JOIN users u ON gm.user_id = u.id
   LEFT JOIN cost_calc c ON c.user_id = gm.user_id
-  WHERE gm.group_id = p_group_id AND gm.is_active = true
+  WHERE gm.group_id = p_group_id AND gm.is_active = true AND gm.role != 'pending'
   GROUP BY u.id, u.full_name
   ORDER BY u.full_name ASC;
 END;

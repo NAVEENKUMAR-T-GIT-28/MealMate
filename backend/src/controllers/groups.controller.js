@@ -2,7 +2,7 @@ import supabase from '../config/db.js';
 import { generateInviteCode } from '../utils/inviteCode.js';
 
 export const createGroup = async (req, res) => {
-  const { name } = req.body;
+  const { name, prices } = req.body;
   const userId = req.user.id;
 
   if (!name) return res.status(400).json({ error: 'Group name is required' });
@@ -34,12 +34,16 @@ export const createGroup = async (req, res) => {
 
     // Initial default prices for the new group
     const today = new Date().toISOString().split('T')[0];
+    const morningPrice = prices?.morning ?? 0;
+    const afternoonPrice = prices?.afternoon ?? 0;
+    const nightPrice = prices?.night ?? 0;
+
     const { error: pricesError } = await supabase
       .from('meal_prices')
       .insert([
-        { group_id: group.id, meal_type: 'morning', price: 0, effective_from: today, created_by: userId },
-        { group_id: group.id, meal_type: 'afternoon', price: 0, effective_from: today, created_by: userId },
-        { group_id: group.id, meal_type: 'night', price: 0, effective_from: today, created_by: userId }
+        { group_id: group.id, meal_type: 'morning', price: morningPrice, effective_from: today, created_by: userId },
+        { group_id: group.id, meal_type: 'afternoon', price: afternoonPrice, effective_from: today, created_by: userId },
+        { group_id: group.id, meal_type: 'night', price: nightPrice, effective_from: today, created_by: userId }
       ]);
 
     if (pricesError) throw pricesError;
@@ -80,7 +84,7 @@ export const joinGroup = async (req, res) => {
 
     const { error: insertError } = await supabase
       .from('group_members')
-      .insert([{ group_id: group.id, user_id: userId, role: 'member' }]);
+      .insert([{ group_id: group.id, user_id: userId, role: 'pending' }]);
 
     if (insertError) throw insertError;
 
@@ -193,5 +197,46 @@ export const removeMember = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error removing member' });
+  }
+};
+
+export const admitMember = async (req, res) => {
+  const { groupId, userId } = req.params;
+
+  try {
+    const { error } = await supabase
+      .from('group_members')
+      .update({ role: 'member', is_active: true })
+      .eq('group_id', groupId)
+      .eq('user_id', userId)
+      .eq('role', 'pending');
+
+    if (error) throw error;
+
+    res.json({ message: 'Member admitted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error admitting member' });
+  }
+};
+
+export const cancelJoinRequest = async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    const { error } = await supabase
+      .from('group_members')
+      .delete()
+      .eq('group_id', groupId)
+      .eq('user_id', userId)
+      .eq('role', 'pending');
+
+    if (error) throw error;
+
+    res.json({ message: 'Join request cancelled' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error cancelling join request' });
   }
 };

@@ -38,6 +38,10 @@ export const requireGroupMember = async (req, res, next) => {
       return res.status(403).json({ error: 'Forbidden: You are not an active member of this group' });
     }
 
+    if (member.role === 'pending') {
+      return res.status(403).json({ error: 'Forbidden: Your membership is pending admin approval', code: 'PENDING' });
+    }
+
     req.membership = { groupId, role: member.role };
     next();
   } catch (err) {
