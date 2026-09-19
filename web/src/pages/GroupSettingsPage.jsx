@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Copy, RefreshCw, UserMinus, UserPlus, Shield, Edit2, Power, Trash2, Check, X, Clock } from 'lucide-react';
 import { useGroup } from '../context/GroupContext';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +10,7 @@ import './GroupSettingsPage.css';
 export default function GroupSettingsPage() {
   const { currentGroup, allMembers, isAdmin, refreshMembers, admitMember } = useGroup();
   const { user, updateProfile } = useAuth();
+  const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
 
@@ -23,14 +25,8 @@ export default function GroupSettingsPage() {
     setModalInput('');
   };
 
-  const handleEditName = (currentName) => {
-    setModalInput(currentName);
-    setModalConfig({
-      type: 'edit_name',
-      title: 'Edit Your Name',
-      confirmText: 'Save',
-      originalName: currentName
-    });
+  const handleEditName = () => {
+    navigate('/profile');
   };
 
   const handleToggleStatus = (memberId, currentStatus) => {
@@ -75,19 +71,7 @@ export default function GroupSettingsPage() {
   const confirmModalAction = async () => {
     if (!modalConfig) return;
 
-    if (modalConfig.type === 'edit_name') {
-      if (modalInput.trim() !== "" && modalInput !== modalConfig.originalName) {
-        const res = await updateProfile(modalInput.trim());
-        if (res.success) {
-          refreshMembers();
-          closeModal();
-        } else {
-          alert(res.error || "Failed to update name");
-        }
-      } else {
-        closeModal();
-      }
-    } else if (modalConfig.action === 'toggle_status') {
+    if (modalConfig.action === 'toggle_status') {
       try {
         await groupsApi.updateMemberStatus(currentGroup.id, modalConfig.memberId, !modalConfig.currentStatus);
         refreshMembers();
@@ -273,7 +257,7 @@ export default function GroupSettingsPage() {
 
               <div className="member-actions">
                 {member.user_id === user?.id && (
-                  <button className="action-btn edit-btn" onClick={() => handleEditName(member.name)} title="Edit your name">
+                  <button className="action-btn edit-btn" onClick={handleEditName} title="Edit your profile">
                     <Edit2 size={16} />
                   </button>
                 )}
@@ -304,16 +288,7 @@ export default function GroupSettingsPage() {
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h3 className="modal-title">{modalConfig.title}</h3>
             
-            {modalConfig.type === 'edit_name' ? (
-              <input
-                type="text"
-                className="modal-input"
-                value={modalInput}
-                onChange={e => setModalInput(e.target.value)}
-                autoFocus
-                onKeyDown={e => e.key === 'Enter' && confirmModalAction()}
-              />
-            ) : (
+            {modalConfig.type === 'edit_name' ? null : (
               <p className="modal-body">{modalConfig.message}</p>
             )}
 

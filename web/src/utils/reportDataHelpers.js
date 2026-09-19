@@ -39,7 +39,7 @@ export async function fetchExportData(groupId, monthStr) {
     afternoonCount: parseInt(m.afternoon_count || 0),
     nightCount: parseInt(m.night_count || 0),
     totalCost: parseFloat(m.total_cost || 0)
-  }));
+  })).sort((a, b) => a.memberName.localeCompare(b.memberName));
 
   const summary = {
     members: mappedMembers,
@@ -76,13 +76,40 @@ export async function fetchExportData(groupId, monthStr) {
     });
   }
 
-  // Create member details map
+  // Generate array of all dates in the requested month
+  const [year, monthNum] = monthStr.split('-').map(Number);
+  const numDays = new Date(year, monthNum, 0).getDate();
+  const allDaysInMonth = [];
+  for (let i = 1; i <= numDays; i++) {
+    const dayStr = String(i).padStart(2, '0');
+    allDaysInMonth.push(`${monthStr}-${dayStr}`);
+  }
+
+  // Create member details map with all days padded
   const memberDetailsMap = {};
   for (const m of mappedMembers) {
     const att = attendanceByMember[m.memberId] || { days: [], member: { name: m.memberName } };
     
-    // Sort days chronologically
-    att.days.sort((a, b) => a.date.localeCompare(b.date));
+    // Map existing days by date string for quick lookup
+    const existingDaysMap = {};
+    for (const d of att.days) {
+      existingDaysMap[d.date] = d;
+    }
+
+    // Ensure every day of the month is represented
+    const fullDays = allDaysInMonth.map(date => {
+      if (existingDaysMap[date]) {
+        return existingDaysMap[date];
+      }
+      // If missing from DB, pad with zero/absent values
+      return {
+        date: date,
+        morning: false,
+        afternoon: false,
+        night: false,
+        dayTotal: 0
+      };
+    });
 
     memberDetailsMap[m.memberId] = {
       member: att.member,
@@ -91,7 +118,7 @@ export async function fetchExportData(groupId, monthStr) {
       afternoonCount: m.afternoonCount,
       nightCount: m.nightCount,
       grandTotal: m.totalCost,
-      days: att.days
+      days: fullDays
     };
   }
 

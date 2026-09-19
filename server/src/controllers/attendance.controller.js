@@ -57,20 +57,58 @@ export const toggleAttendance = async (req, res) => {
   }
 
   try {
-    const { data: result, error } = await supabase.rpc('toggle_attendance', {
-      p_group_id: group_id,
-      p_user_id: effectiveUserId,
-      p_date: date,
-      p_meal_type: meal_type
-    });
+    // 1. Check if an attendance record already exists for this user, group, and date
+    const { data: existing, error: fetchError } = await supabase
+      .from('attendance')
+      .select('*')
+      .eq('group_id', group_id)
+      .eq('user_id', effectiveUserId)
+      .eq('date', date)
+      .maybeSingle();
 
-    if (error) {
-      console.error('RPC Error:', error);
-      throw error;
+    if (fetchError) {
+      console.error('Fetch Error:', fetchError);
+      throw fetchError;
     }
 
-    // The RPC returns a setof attendance, we want the first (and only) row
-    res.json(result[0] || result);
+    let result;
+
+    if (existing) {
+      // 2. If it exists, toggle the specific meal type boolean
+      const updatedValue = !existing[meal_type];
+      
+      const { data: updated, error: updateError } = await supabase
+        .from('attendance')
+        .update({ 
+          [meal_type]: updatedValue,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existing.id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+      result = updated;
+    } else {
+      // 3. If it doesn't exist, insert a new record
+      const { data: inserted, error: insertError } = await supabase
+        .from('attendance')
+        .insert([{
+          group_id,
+          user_id: effectiveUserId,
+          date,
+          morning: meal_type === 'morning',
+          afternoon: meal_type === 'afternoon',
+          night: meal_type === 'night'
+        }])
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+      result = inserted;
+    }
+
+    res.json(result);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error updating attendance' });

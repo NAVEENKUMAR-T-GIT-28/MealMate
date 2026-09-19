@@ -1,10 +1,11 @@
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import { format, parseISO } from 'date-fns';
 import { ArrowLeft } from 'lucide-react';
 import MonthNavigator from '../components/MonthNavigator';
 import { useGroup } from '../context/GroupContext';
-import { summaryApi } from '../api/summary';
-import { attendanceApi } from '../api/attendance';
+import { useSummaryQuery } from '../hooks/useSummaryQuery';
+import { useAttendanceMonthQuery } from '../hooks/useAttendanceQuery';
 import {
   currentMonthStr, formatMonth, getNextMonth, getPrevMonth,
   formatDateDisplay
@@ -17,43 +18,33 @@ export default function MemberDetailPage() {
   const { currentGroup, allMembers } = useGroup();
   const location = useLocation();
   const [month, setMonth] = useState(location.state?.month || currentMonthStr());
-  
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [memberSummary, setMemberSummary] = useState(null);
-  const [monthAttendance, setMonthAttendance] = useState([]);
 
+  const groupId = currentGroup?.id;
   const member = allMembers.find(m => m.user_id === Number(memberId));
 
-  const fetchData = useCallback(async () => {
-    if (!currentGroup || !member) return;
-    try {
-      setLoading(true);
-      setError('');
-      
-      const [summaryData, attendanceData] = await Promise.all([
-        summaryApi.getSummary(currentGroup.id, month),
-        attendanceApi.getAttendanceForMonth(currentGroup.id, month, memberId)
-      ]);
-      
-      const mSummary = summaryData.members.find(m => m.user_id === Number(memberId));
-      setMemberSummary(mSummary || {
-         morning_count: 0, afternoon_count: 0, night_count: 0,
-         morning_cost: 0, afternoon_cost: 0, night_cost: 0, total_cost: 0
-      });
-      
-      setMonthAttendance(attendanceData);
-    } catch (err) {
-      console.error(err);
-      setError('Failed to fetch data');
-    } finally {
-      setLoading(false);
-    }
-  }, [currentGroup, month, member, memberId]);
+  // Server-state via TanStack Query
+  const {
+    data: summaryData,
+    isLoading: summaryLoading,
+    error: summaryError,
+  } = useSummaryQuery(groupId, month);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const {
+    data: monthAttendance = [],
+    isLoading: attendanceLoading,
+  } = useAttendanceMonthQuery(groupId, month, memberId);
+
+  const isLoading = summaryLoading || attendanceLoading;
+  const error = summaryError ? 'Failed to fetch data' : '';
+
+  // Derive member summary from the full summary response
+  const memberSummary = useMemo(() => {
+    if (!summaryData) return null;
+    return summaryData.members.find(m => m.user_id === Number(memberId)) || {
+      morning_count: 0, afternoon_count: 0, night_count: 0,
+      morning_cost: 0, afternoon_cost: 0, night_cost: 0, total_cost: 0
+    };
+  }, [summaryData, memberId]);
 
   if (!member) {
     return (
@@ -100,7 +91,7 @@ export default function MemberDetailPage() {
       
       {error && <div className="auth-error" style={{margin: '1rem', color: 'var(--color-danger)'}}>{error}</div>}
 
-      {loading ? (
+      {isLoading && !memberSummary ? (
         <div className="flex justify-center p-8 text-[var(--color-text-secondary)]">Loading details...</div>
       ) : (
         <>
@@ -141,7 +132,11 @@ export default function MemberDetailPage() {
 
                 return (
                   <div key={dateStr} className={`detail-calendar-row ${isFuture ? 'future' : ''}`}>
-                    <div className="detail-date">{formatDateDisplay(dateStr)}</div>
+                    <div className="detail-date" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <span>{format(d, 'dd/MM/yyyy')}</span>
+                      <span style={{ width: '32px', display: 'inline-block', textTransform: 'uppercase' }}>{format(d, 'EEE')}</span>
+
+                    </div>
                     <div className="detail-meal">
                       {dayData?.morning ? <span className="meal-dot morning"></span> : '-'}
                     </div>

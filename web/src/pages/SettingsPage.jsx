@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { Sun, Moon, Monitor, CheckCircle, FileSpreadsheet, FileText } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useGroup } from '../context/GroupContext';
-import { pricesApi } from '../api/prices';
+import { usePricesQuery } from '../hooks/usePricesQuery';
+import { useSavePrices } from '../hooks/useSavePrices';
 import { formatMonth, todayStr } from '../utils/dateUtils';
 import { exportToPdf } from '../utils/exportPdf';
 import { exportToExcel } from '../utils/exportExcel';
@@ -12,68 +13,69 @@ export default function SettingsPage() {
   const { mode, setMode } = useTheme();
   const { currentGroup, isAdmin } = useGroup();
 
-  const [morningInput, setMorningInput] = useState('');
-  const [afternoonInput, setAfternoonInput] = useState('');
-  const [nightInput, setNightInput] = useState('');
-  
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const groupId = currentGroup?.id;
+
+  // Server-state via TanStack Query
+  const { data: pricesData } = usePricesQuery(groupId);
+
+  // Derive latest prices from cached price history
+  const latestPrices = (() => {
+    const latest = { morning: '0', afternoon: '0', night: '0' };
+    if (!pricesData) return latest;
+    for (const p of pricesData) {
+      if (latest[p.meal_type] === '0' || latest[p.meal_type] === '') {
+        latest[p.meal_type] = String(p.price);
+      }
+    }
+    return latest;
+  })();
+
+  const [morningInput, setMorningInput] = useState(null);
+  const [afternoonInput, setAfternoonInput] = useState(null);
+  const [nightInput, setNightInput] = useState(null);
+
+  // Use local input if user has edited, otherwise show cached server data
+  const morningValue = morningInput !== null ? morningInput : latestPrices.morning;
+  const afternoonValue = afternoonInput !== null ? afternoonInput : latestPrices.afternoon;
+  const nightValue = nightInput !== null ? nightInput : latestPrices.night;
+
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
 
-  // Simplified month selection since dynamic months requires more API
   const [selectedMonth, setSelectedMonth] = useState(todayStr().substring(0, 7));
 
-  const fetchPrices = useCallback(async () => {
-    if (!currentGroup) return;
-    try {
-      const pricesData = await pricesApi.getPrices(currentGroup.id);
-      if (pricesData) {
-        // pricesData is sorted by effective_from DESC. We just take the first occurrence of each meal_type
-        const latest = { morning: '', afternoon: '', night: '' };
-        for (const p of pricesData) {
-          if (latest[p.meal_type] === '') {
-            latest[p.meal_type] = p.price;
-          }
-        }
-        setMorningInput(String(latest.morning || 0));
-        setAfternoonInput(String(latest.afternoon || 0));
-        setNightInput(String(latest.night || 0));
-      }
-    } catch (err) {
-      console.error(err);
-      setError('Failed to fetch prices');
-    }
-  }, [currentGroup]);
-
-  useEffect(() => {
-    fetchPrices();
-  }, [fetchPrices]);
+  // Price mutation via TanStack Query
+  const savePricesMutation = useSavePrices(groupId);
 
   const handleSave = async () => {
     if (!currentGroup) return;
-    setSaving(true);
     setError('');
-    
     const today = todayStr();
-    
-    try {
-      const promises = [];
-      promises.push(pricesApi.setPrice(currentGroup.id, 'morning', Number(morningInput), today));
-      promises.push(pricesApi.setPrice(currentGroup.id, 'afternoon', Number(afternoonInput), today));
-      promises.push(pricesApi.setPrice(currentGroup.id, 'night', Number(nightInput), today));
-      
-      await Promise.all(promises);
-      
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch (err) {
-      console.error(err);
-      setError('Failed to save prices');
-    } finally {
-      setSaving(false);
-    }
+
+    savePricesMutation.mutate(
+      {
+        morningPrice: Number(morningValue),
+        afternoonPrice: Number(afternoonValue),
+        nightPrice: Number(nightValue),
+        effectiveFrom: today,
+      },
+      {
+        onSuccess: () => {
+          // Reset local overrides so inputs reflect fresh server data
+          setMorningInput(null);
+          setAfternoonInput(null);
+          setNightInput(null);
+        },
+        onError: (err) => {
+          console.error(err);
+          setError('Failed to save prices');
+        },
+      }
+    );
   };
+
+  const saved = savePricesMutation.isSuccess;
+  const saving = savePricesMutation.isPending;
 
   const handleExport = async (type) => {
     if (!currentGroup) return;
@@ -138,7 +140,7 @@ export default function SettingsPage() {
               <input
                 type="number"
                 className="price-input"
-                value={morningInput}
+                value={morningValue}
                 onChange={(e) => setMorningInput(e.target.value)}
               />
             </div>
@@ -147,7 +149,7 @@ export default function SettingsPage() {
               <input
                 type="number"
                 className="price-input"
-                value={afternoonInput}
+                value={afternoonValue}
                 onChange={(e) => setAfternoonInput(e.target.value)}
               />
             </div>
@@ -156,7 +158,7 @@ export default function SettingsPage() {
               <input
                 type="number"
                 className="price-input"
-                value={nightInput}
+                value={nightValue}
                 onChange={(e) => setNightInput(e.target.value)}
               />
             </div>

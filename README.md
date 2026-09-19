@@ -37,7 +37,7 @@ The MealMate ecosystem is designed for multi-client access backed by a centraliz
 - `docs/`: Permanent technical documentation for the system.
 
 ## Technology Stack
-- **Web Frontend:** React, Vite, React Router, Axios, Context API, Vanilla CSS.
+- **Web Frontend:** React, Vite, React Router, Axios, Context API, TanStack Query (React Query v5), Vanilla CSS.
 - **Backend API:** Node.js, Express.js, Zod, Helmet.
 - **Database:** Supabase PostgreSQL.
 - **Authentication:** Custom JWT with `bcrypt`.
@@ -47,7 +47,7 @@ The MealMate ecosystem is designed for multi-client access backed by a centraliz
 - **Multi-Tenant Groups:** Users can create isolated groups or join via a 6-character invite code.
 - **Attendance Tracking:** Daily logging of morning, afternoon, and night meals.
 - **Historical Pricing:** Group admins can set effective prices for specific meals starting from specific dates.
-- **Automated Summaries:** Accurate monthly roll-ups calculating total group expenses and individual member contributions based on precise historical pricing.
+- **Automated Summaries:** Accurate monthly roll-ups calculating total group expenses and individual member contributions based on precise historical pricing, with one-click Excel and PDF exports.
 
 ## Authentication
 Authentication is fully handled by the `server/`. It uses `bcrypt` for password hashing and issues cryptographically signed JSON Web Tokens (JWT). For the web client, these tokens are securely injected into `HttpOnly`, `SameSite: strict` cookies, rendering them immune to XSS theft. 

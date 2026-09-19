@@ -12,6 +12,7 @@ import MemberDetailPage from './pages/MemberDetailPage';
 import HistoryPage from './pages/HistoryPage';
 import SettingsPage from './pages/SettingsPage';
 import GroupSettingsPage from './pages/GroupSettingsPage';
+import ProfilePage from './pages/ProfilePage';
 
 function App() {
   return (
@@ -43,6 +44,7 @@ function App() {
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/group-settings" element={<GroupSettingsPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

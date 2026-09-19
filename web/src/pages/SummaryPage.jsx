@@ -1,60 +1,49 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import MonthNavigator from '../components/MonthNavigator';
 import SummaryTable from '../components/SummaryTable';
+import { useAuth } from '../context/AuthContext';
 import { useGroup } from '../context/GroupContext';
-import { summaryApi } from '../api/summary';
-import { pricesApi } from '../api/prices';
+import { useSummaryQuery } from '../hooks/useSummaryQuery';
+import { usePricesQuery } from '../hooks/usePricesQuery';
 import {
   currentMonthStr, formatMonth, getNextMonth, getPrevMonth,
 } from '../utils/dateUtils';
 import './SummaryPage.css';
 
 export default function SummaryPage() {
-  const { currentGroup } = useGroup();
+  const { currentGroup, allMembers } = useGroup();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
   const [month, setMonth] = useState(location.state?.month || currentMonthStr());
-  const [summary, setSummary] = useState({ members: [], grandTotal: 0 });
-  const [currentPrices, setCurrentPrices] = useState({ morning: 0, afternoon: 0, night: 0 });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
-  const fetchSummaryAndPrices = useCallback(async () => {
-    if (!currentGroup) return;
-    try {
-      setLoading(true);
-      setError('');
-      const [summaryData, pricesData] = await Promise.all([
-        summaryApi.getSummary(currentGroup.id, month),
-        pricesApi.getPrices(currentGroup.id)
-      ]);
-      
-      setSummary(summaryData);
-      
-      // Compute latest active prices
-      if (pricesData) {
-        const pricesMap = { morning: 0, afternoon: 0, night: 0 };
-        const now = new Date();
-        for (const p of pricesData) {
-          if (new Date(p.effective_from) <= now) {
-            pricesMap[p.meal_type] = p.price;
-          }
-        }
-        setCurrentPrices(pricesMap);
+  const groupId = currentGroup?.id;
+
+  // Server-state via TanStack Query
+  const {
+    data: summary = { members: [], grandTotal: 0 },
+    isLoading,
+    error: queryError,
+  } = useSummaryQuery(groupId, month);
+
+  const { data: pricesData } = usePricesQuery(groupId);
+
+  // Compute latest active prices from the price history
+  const currentPrices = (() => {
+    const pricesMap = { morning: 0, afternoon: 0, night: 0 };
+    if (!pricesData) return pricesMap;
+    const now = new Date();
+    for (const p of pricesData) {
+      if (new Date(p.effective_from) <= now) {
+        pricesMap[p.meal_type] = p.price;
       }
-    } catch (err) {
-      console.error(err);
-      setError('Failed to load summary');
-    } finally {
-      setLoading(false);
     }
-  }, [currentGroup, month]);
+    return pricesMap;
+  })();
 
-  useEffect(() => {
-    fetchSummaryAndPrices();
-  }, [fetchSummaryAndPrices]);
+  const error = queryError ? 'Failed to load summary' : '';
 
   if (!currentGroup) return <div className="summary-page"><div className="empty-state">No group selected.</div></div>;
 
@@ -85,13 +74,23 @@ export default function SummaryPage() {
         </span>
       </div>
 
-      {/* Summary Table */}
-      {loading ? (
+      {isLoading && summary.members.length === 0 ? (
         <div className="flex justify-center p-8 text-[var(--color-text-secondary)]">Loading summary...</div>
       ) : summary.members.length > 0 ? (
         <div className="animate-fade-in-up delay-3">
           <SummaryTable
-            members={summary.members}
+            members={[...summary.members].sort((a, b) => {
+              if (a.user_id === user?.id) return -1;
+              if (b.user_id === user?.id) return 1;
+
+              const roleA = allMembers.find(m => m.user_id === a.user_id)?.role;
+              const roleB = allMembers.find(m => m.user_id === b.user_id)?.role;
+
+              if (roleA === 'admin') return -1;
+              if (roleB === 'admin') return 1;
+
+              return 0;
+            })}
             grandTotal={summary.grandTotal}
             onMemberPress={(memberId) =>
               navigate(`/summary/${memberId}`, { state: { month } })

@@ -1,65 +1,68 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueries } from '@tanstack/react-query';
 import { Calendar, ChevronUp, ChevronDown, ChevronRight } from 'lucide-react';
 import { useGroup } from '../context/GroupContext';
 import { summaryApi } from '../api/summary';
-import { formatMonth, formatShortMonth, todayStr, addDaysStr } from '../utils/dateUtils';
+import { queryKeys } from '../hooks/queryKeys';
+import { formatMonth, formatShortMonth } from '../utils/dateUtils';
 import './HistoryPage.css';
 
 export default function HistoryPage() {
   const navigate = useNavigate();
   const { currentGroup } = useGroup();
-  const [loading, setLoading] = useState(true);
-  const [monthsData, setMonthsData] = useState([]);
 
-  const fetchHistory = useCallback(async () => {
-    if (!currentGroup) return;
-    try {
-      setLoading(true);
-      // Fetch months from group creation up to current month (max 24 months to avoid huge requests)
-      const current = new Date();
-      const createdDate = currentGroup.created_at ? new Date(currentGroup.created_at) : current;
-      
-      const monthsToFetch = [];
-      let d = new Date(current.getFullYear(), current.getMonth(), 1);
-      const end = new Date(createdDate.getFullYear(), createdDate.getMonth(), 1);
+  // Compute list of months to fetch (from group creation to now, max 24)
+  const monthsToFetch = useMemo(() => {
+    if (!currentGroup) return [];
+    const current = new Date();
+    const createdDate = currentGroup.created_at ? new Date(currentGroup.created_at) : current;
+    
+    const months = [];
+    let d = new Date(current.getFullYear(), current.getMonth(), 1);
+    const end = new Date(createdDate.getFullYear(), createdDate.getMonth(), 1);
 
-      let maxMonths = 24; 
-      while (d >= end && maxMonths > 0) {
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        monthsToFetch.push(`${y}-${m}`);
-        d.setMonth(d.getMonth() - 1);
-        maxMonths--;
-      }
-
-      const results = await Promise.all(
-        monthsToFetch.map(async m => {
-          try {
-            const data = await summaryApi.getSummary(currentGroup.id, m);
-            const totalEntryCount = data.members.reduce((sum, member) => {
-              return sum + (member.morning_count || 0) + (member.afternoon_count || 0) + (member.night_count || 0);
-            }, 0);
-            return { month: m, totalSpent: data.grandTotal, entryCount: totalEntryCount };
-          } catch {
-            return null;
-          }
-        })
-      );
-      setMonthsData(results.filter(Boolean));
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
+    let maxMonths = 24;
+    while (d >= end && maxMonths > 0) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      months.push(`${y}-${m}`);
+      d.setMonth(d.getMonth() - 1);
+      maxMonths--;
     }
+    return months;
   }, [currentGroup]);
 
-  useEffect(() => {
-    fetchHistory();
-  }, [fetchHistory]);
+  const groupId = currentGroup?.id;
+
+  // Use TanStack Query's useQueries for parallel per-month cached queries
+  const summaryQueries = useQueries({
+    queries: monthsToFetch.map(month => ({
+      queryKey: queryKeys.summary(groupId, month),
+      queryFn: () => summaryApi.getSummary(groupId, month),
+      staleTime: 5 * 60 * 1000,
+      enabled: !!groupId,
+    })),
+  });
+
+  const loading = summaryQueries.some(q => q.isLoading);
+
+  // Derive monthsData from query results
+  const monthsData = useMemo(() => {
+    return summaryQueries
+      .map((q, idx) => {
+        if (!q.data) return null;
+        const data = q.data;
+        const totalEntryCount = data.members.reduce((sum, member) => {
+          return sum + (member.morning_count || 0) + (member.afternoon_count || 0) + (member.night_count || 0);
+        }, 0);
+        return { month: monthsToFetch[idx], totalSpent: data.grandTotal, entryCount: totalEntryCount };
+      })
+      .filter(Boolean);
+  }, [summaryQueries, monthsToFetch]);
 
   // Group by year
-  const years = (() => {
+  const years = useMemo(() => {
     const map = new Map();
     for (const m of monthsData) {
       const year = m.month.substring(0, 4);
@@ -77,7 +80,7 @@ export default function HistoryPage() {
     }
     list.sort((a, b) => b.year.localeCompare(a.year));
     return list;
-  })();
+  }, [monthsData]);
 
   const [expandedYears, setExpandedYears] = useState(null);
 
@@ -87,11 +90,11 @@ export default function HistoryPage() {
     }
   }, [years, expandedYears]);
 
-  const maxSpend = (() => {
+  const maxSpend = useMemo(() => {
     let max = 0;
     for (const y of years) for (const m of y.months) if (m.totalSpent > max) max = m.totalSpent;
     return max || 1;
-  })();
+  }, [years]);
 
   const toggleYear = (year) => {
     setExpandedYears(prev => {
@@ -101,7 +104,7 @@ export default function HistoryPage() {
     });
   };
 
-  if (loading) {
+  if (loading && monthsData.length === 0) {
     return <div className="flex justify-center p-8 text-[var(--color-text-secondary)]">Loading history...</div>;
   }
 

@@ -41,13 +41,14 @@ The `mobile` component will utilize the exact same `server` pipeline in a deferr
 
 ## Request Flow
 1. **Client Initiation:** The client (e.g., Web SPA) dispatches an HTTP request. For authenticated routes, it automatically includes an HttpOnly cookie containing the JWT.
-2. **Express Ingress:** The `server` receives the request. It first passes through `helmet` and `cors` middleware for security hardening.
-3. **Zod Validation:** The `validate.js` middleware intercepts the request. It parses `req.body`, `req.query`, and `req.params` against strict Zod schemas. Invalid payloads are immediately rejected (`400 Bad Request`).
-4. **Authentication (`auth.js`):** The `requireAuth` middleware verifies the JWT signature using `JWT_SECRET`. It extracts `req.user.id` to establish the authenticated identity.
-5. **Authorization (RBAC):** For protected routes, `requireGroupMember` or `requireGroupAdmin` performs a real-time Postgres query to ensure the authenticated user has legitimate access rights to the requested `groupId`.
-6. **Controller Logic:** The specific controller processes the verified data, applying business rules (e.g., historical pricing resolution).
-7. **Database Execution:** The controller queries Supabase PostgreSQL via the backend Service Role Key.
-8. **Response:** A JSON response is returned to the client.
+2. **Cache Check (TanStack Query):** Before reaching the network, TanStack Query checks the in-memory cache. If fresh cached data exists for the query key, it is returned immediately without an API call. If the data is stale, a background revalidation is triggered while the cached data is shown.
+3. **Express Ingress:** The `server` receives the request. It first passes through `helmet` and `cors` middleware for security hardening.
+4. **Zod Validation:** The `validate.js` middleware intercepts the request. It parses `req.body`, `req.query`, and `req.params` against strict Zod schemas. Invalid payloads are immediately rejected (`400 Bad Request`).
+5. **Authentication (`auth.js`):** The `requireAuth` middleware verifies the JWT signature using `JWT_SECRET`. It extracts `req.user.id` to establish the authenticated identity.
+6. **Authorization (RBAC):** For protected routes, `requireGroupMember` or `requireGroupAdmin` performs a real-time Postgres query to ensure the authenticated user has legitimate access rights to the requested `groupId`.
+7. **Controller Logic:** The specific controller processes the verified data, applying business rules (e.g., historical pricing resolution).
+8. **Database Execution:** The controller queries Supabase PostgreSQL via the backend Service Role Key.
+9. **Response & Cache Update:** A JSON response is returned to the client. TanStack Query stores the response in the cache for the corresponding query key.
 
 ## Authentication Flow
 MealMate uses a unified JWT authentication strategy designed to securely support both browser-based and native environments.

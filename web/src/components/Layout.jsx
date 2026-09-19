@@ -1,5 +1,5 @@
-import { NavLink, Outlet, useLocation, Navigate } from 'react-router-dom';
-import { CalendarDays, BarChart3, Clock, Settings, LayoutDashboard, Users, LogOut } from 'lucide-react';
+import { NavLink, Link, Outlet, useLocation, Navigate } from 'react-router-dom';
+import { CalendarDays, BarChart3, Clock, Settings, LayoutDashboard, Users, User, LogOut } from 'lucide-react';
 import GroupSwitcher from './GroupSwitcher';
 import { useAuth } from '../context/AuthContext';
 import { useGroup } from '../context/GroupContext';
@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Today' },
   { to: '/summary', icon: BarChart3, label: 'Summary' },
   { to: '/history', icon: Clock, label: 'History' },
+  { to: '/profile', icon: User, label: 'Profile' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
@@ -54,7 +55,15 @@ export default function Layout() {
   const { isAdmin, groups, currentGroup, loading, isPending, cancelRequest } = useGroup();
   const location = useLocation();
 
-  if (!loading && groups.length === 0) {
+  if (loading) {
+    return (
+      <div className="layout" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', width: '100vw' }}>
+        <div className="text-[var(--color-text-secondary)]">Loading your groups...</div>
+      </div>
+    );
+  }
+
+  if (groups.length === 0) {
     return <Navigate to="/groups" replace />;
   }
 
@@ -97,21 +106,19 @@ export default function Layout() {
               <span>{item.label}</span>
             </NavLink>
           ))}
-          {isAdmin && (
-            <NavLink
-              to="/group-settings"
-              className={({ isActive }) =>
-                `sidebar-link ${isActive ? 'active' : ''}`
-              }
-            >
-              <Users size={20} />
-              <span>Group</span>
-            </NavLink>
-          )}
+          <NavLink
+            to="/group-settings"
+            className={({ isActive }) =>
+              `sidebar-link ${isActive ? 'active' : ''}`
+            }
+          >
+            <Users size={20} />
+            <span>Group</span>
+          </NavLink>
         </nav>
 
         <div className="sidebar-footer">
-          <div className="sidebar-user">
+          <Link to="/profile" className="sidebar-user" style={{ textDecoration: 'none', cursor: 'pointer' }}>
             <div
               className="sidebar-user-avatar"
               style={{ background: avatarColor(user?.full_name || 'U') }}
@@ -124,10 +131,7 @@ export default function Layout() {
                 {isAdmin ? 'Admin' : 'Member'}
               </span>
             </div>
-          </div>
-          <button className="sidebar-logout" onClick={logout} title="Logout">
-            <LogOut size={18} />
-          </button>
+          </Link>
         </div>
       </aside>
 
@@ -139,12 +143,14 @@ export default function Layout() {
             <img src="/favicon.png" alt="MealMate Logo" className="logo-icon-sm-img" />
             <GroupSwitcher />
           </div>
-          <div
-            className="mobile-avatar"
-            style={{ background: avatarColor(user?.full_name || 'U') }}
-          >
-            {(user?.full_name || 'U').charAt(0).toUpperCase()}
-          </div>
+          <Link to="/profile" style={{ textDecoration: 'none' }}>
+            <div
+              className="mobile-avatar"
+              style={{ background: avatarColor(user?.full_name || 'U') }}
+            >
+              {(user?.full_name || 'U').charAt(0).toUpperCase()}
+            </div>
+          </Link>
         </header>
 
         <div className="page-content">
@@ -154,7 +160,7 @@ export default function Layout() {
 
       {/* ── Mobile Bottom Tab Bar ────────────────────── */}
       <nav className="bottom-bar">
-        {NAV_ITEMS.map(item => (
+        {NAV_ITEMS.filter(item => item.to !== '/profile').map(item => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -166,17 +172,15 @@ export default function Layout() {
             <span>{item.label}</span>
           </NavLink>
         ))}
-        {isAdmin && (
-          <NavLink
-            to="/group-settings"
-            className={({ isActive }) =>
-              `bottom-tab ${isActive ? 'active' : ''}`
-            }
-          >
-            <Users size={22} />
-            <span>Group</span>
-          </NavLink>
-        )}
+        <NavLink
+          to="/group-settings"
+          className={({ isActive }) =>
+            `bottom-tab ${isActive ? 'active' : ''}`
+          }
+        >
+          <Users size={22} />
+          <span>Group</span>
+        </NavLink>
       </nav>
     </div>
   );

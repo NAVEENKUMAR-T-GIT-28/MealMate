@@ -56,7 +56,7 @@ Records individual meal consumption.
 
 ### Attendance Ownership
 **Rule:** A user can only modify their own attendance.
-**Enforcement:** This is strictly enforced by the backend Express controllers. The `user_id` parameter passed to the `toggle_attendance` RPC is invariably derived from `req.user.id` (the authenticated JWT identity). Even an administrator cannot modify another user's attendance logs.
+**Enforcement:** This is strictly enforced by the backend Express controllers. The controller strictly bounds the `user_id` constraint to `req.user.id` (the authenticated JWT identity) during database queries. Even an administrator cannot modify another user's attendance logs.
 
 ### Group Isolation
 **Rule:** Users must only access data belonging to groups they are authorized to access.
@@ -68,10 +68,6 @@ Records individual meal consumption.
 
 ## RPC Functions (Stored Procedures)
 
-### `toggle_attendance`
-Optimized PostgreSQL function designed to toggle (upsert or delete) an attendance record in a single atomic transaction.
-- **Parameters:** `p_group_id`, `p_user_id`, `p_date`, `p_meal_type`
-- **Behavior:** If the record exists, it deletes it. If it does not exist, it inserts it.
 
 ### `get_monthly_summary`
 Aggregates total expenditures per member for a specific group and month.

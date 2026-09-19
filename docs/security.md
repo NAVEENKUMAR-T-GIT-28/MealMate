@@ -56,3 +56,11 @@ All database interactions flow through the Supabase JS Client, which inherently 
 
 ## Accepted Limitations
 - **Rate Limiting:** Rate limiting mechanisms (e.g., IP-based request throttling) are intentionally disabled and out of scope for the current architectural phase.
+- **Realtime Sync:** Supabase Realtime is not implemented. Cross-user changes are only visible after the local cache revalidates.
+
+## Client-Side Cache Security
+The web application uses TanStack Query as an in-memory server-state cache. This cache is strictly a **read-only presentation layer** and is never used for authorization decisions.
+- The cache stores API responses for performance. It does not replace backend validation.
+- Optimistic UI updates provide instant feedback, but the server always has the final say. Failed mutations trigger rollbacks.
+- No user IDs, roles, or permissions from the cache are used to authorize operations. All authorization remains server-side via `requireAuth`, `requireGroupMember`, and `requireGroupAdmin` middleware.
+- No secrets (JWT, Supabase keys) exist in the frontend environment or cache.
