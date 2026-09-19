@@ -3,6 +3,7 @@
     "name": "MealMate",
     "slug": "mealmate",
     "version": "1.2.1",
+    "author": "Naveenkumar T",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "mealmate",

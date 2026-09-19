@@ -2,6 +2,7 @@
   "name": "meal-mate",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "author": "Naveenkumar T",
   "dependencies": {
     "@expo/ui": "~57.0.9",
     "@expo/vector-icons": "^15.0.2",

@@ -2,6 +2,7 @@
   "name": "mealmate-web-frontend",
   "private": true,
   "version": "2.0.0",
+  "author": "Naveenkumar T",
   "type": "module",
   "scripts": {
     "dev": "vite",
