@@ -81,3 +81,6 @@ For deep technical insights, refer to the following resources:
 - [Web Application README](web/README.md)
 - [Server API README](server/README.md)
 - [Mobile Application README](mobile/README.md)
+
+## License
+This project is licensed under the [MIT License](LICENSE).
