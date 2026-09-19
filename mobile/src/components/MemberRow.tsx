@@ -2,8 +2,9 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Animated, { FadeInRight } from 'react-native-reanimated';
 import { MealToggle } from './MealToggle';
-import { THEME, useAppTheme, type ThemeColors } from '@/utils/theme';
-import type { MealType } from '@/db/entries.repo';
+import { THEME, useAppTheme, type ThemeColors } from '../utils/theme';
+
+export type MealType = 'morning' | 'afternoon' | 'night';
 
 interface MemberRowProps {
   memberId: number;
@@ -11,6 +12,7 @@ interface MemberRowProps {
   meals: Record<MealType, boolean>;
   onToggle: (memberId: number, meal: MealType) => void;
   index: number;
+  disabled?: boolean;
 }
 
 export const MemberRow = React.memo(function MemberRow({
@@ -19,6 +21,7 @@ export const MemberRow = React.memo(function MemberRow({
   meals,
   onToggle,
   index,
+  disabled = false,
 }: MemberRowProps) {
   const colors = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -44,24 +47,28 @@ export const MemberRow = React.memo(function MemberRow({
           mealType="morning"
           isActive={meals.morning}
           onToggle={() => onToggle(memberId, 'morning')}
+          disabled={disabled}
         />
         <MealToggle
           mealType="afternoon"
           isActive={meals.afternoon}
           onToggle={() => onToggle(memberId, 'afternoon')}
+          disabled={disabled}
         />
         <MealToggle
           mealType="night"
           isActive={meals.night}
           onToggle={() => onToggle(memberId, 'night')}
+          disabled={disabled}
         />
       </View>
     </Animated.View>
   );
-}, (prevProps, nextProps) => {
+}, (prevProps: MemberRowProps, nextProps: MemberRowProps) => {
   return (
     prevProps.memberId === nextProps.memberId &&
     prevProps.name === nextProps.name &&
+    prevProps.disabled === nextProps.disabled &&
     prevProps.meals.morning === nextProps.meals.morning &&
     prevProps.meals.afternoon === nextProps.meals.afternoon &&
     prevProps.meals.night === nextProps.meals.night &&

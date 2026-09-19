@@ -54,3 +54,15 @@ export function addDays(dateStr: string, days: number): string {
 export function getMonthFromDate(dateStr: string): string {
   return dateStr.substring(0, 7); // 'yyyy-MM'
 }
+
+export function getPrevMonth(monthStr: string): string {
+  const [year, month] = monthStr.split('-').map(Number);
+  const d = new Date(year, month - 2, 1);
+  return format(d, 'yyyy-MM');
+}
+
+export function getNextMonth(monthStr: string): string {
+  const [year, month] = monthStr.split('-').map(Number);
+  const d = new Date(year, month, 1);
+  return format(d, 'yyyy-MM');
+}

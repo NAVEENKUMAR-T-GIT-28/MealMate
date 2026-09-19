@@ -5,15 +5,15 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
 } from 'react-native-reanimated';
-import { THEME, useAppTheme, type ThemeColors } from '@/utils/theme';
-import type { MealType } from '@/db/entries.repo';
+import { THEME, useAppTheme, type ThemeColors } from '../utils/theme';
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+export type MealType = 'morning' | 'afternoon' | 'night';
 
 interface MealToggleProps {
   mealType: MealType;
   isActive: boolean;
   onToggle: () => void;
+  disabled?: boolean;
 }
 
 const getMealConfig = (colors: ThemeColors): Record<MealType, { label: string; emoji: string; color: string; bgColor: string }> => ({
@@ -22,7 +22,9 @@ const getMealConfig = (colors: ThemeColors): Record<MealType, { label: string; e
   night: { label: 'Night', emoji: '🌙', color: colors.night, bgColor: colors.nightBg },
 });
 
-export function MealToggle({ mealType, isActive, onToggle }: MealToggleProps) {
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+export function MealToggle({ mealType, isActive, onToggle, disabled = false }: MealToggleProps) {
   const colors = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -34,16 +36,19 @@ export function MealToggle({ mealType, isActive, onToggle }: MealToggleProps) {
   }));
 
   const handlePressIn = () => {
+    if (disabled) return;
     scale.value = withSpring(0.9, { damping: 15 });
   };
 
   const handlePressOut = () => {
+    if (disabled) return;
     scale.value = withSpring(1, { damping: 15 });
   };
 
   return (
     <AnimatedPressable
-      onPress={onToggle}
+      onPress={disabled ? undefined : onToggle}
+      disabled={disabled}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       style={[
@@ -53,6 +58,7 @@ export function MealToggle({ mealType, isActive, onToggle }: MealToggleProps) {
           backgroundColor: isActive ? config.color : config.bgColor,
           borderColor: config.color,
           borderWidth: isActive ? 0 : 1,
+          opacity: disabled ? 0.75 : 1,
         },
       ]}
     >

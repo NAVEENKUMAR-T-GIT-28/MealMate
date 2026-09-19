@@ -95,27 +95,7 @@ export default function MemberDetailPage() {
         <div className="flex justify-center p-8 text-[var(--color-text-secondary)]">Loading details...</div>
       ) : (
         <>
-          <div className="detail-stats animate-fade-in-down delay-1">
-            <div className="stat-card" style={{ borderLeftColor: 'var(--morning)' }}>
-              <span className="stat-emoji">☀️</span>
-              <span className="stat-value">{memberSummary?.morning_count || 0}</span>
-              <span className="stat-label">₹{memberSummary?.morning_cost || 0}</span>
-            </div>
-            <div className="stat-card" style={{ borderLeftColor: 'var(--afternoon)' }}>
-              <span className="stat-emoji">🌤️</span>
-              <span className="stat-value">{memberSummary?.afternoon_count || 0}</span>
-              <span className="stat-label">₹{memberSummary?.afternoon_cost || 0}</span>
-            </div>
-            <div className="stat-card" style={{ borderLeftColor: 'var(--night)' }}>
-              <span className="stat-emoji">🌙</span>
-              <span className="stat-value">{memberSummary?.night_count || 0}</span>
-              <span className="stat-label">₹{memberSummary?.night_cost || 0}</span>
-            </div>
-            <div className="stat-card" style={{ borderLeftColor: 'var(--primary)' }}>
-              <span className="stat-label">Total</span>
-              <span className="stat-value primary">₹{memberSummary?.total_cost || 0}</span>
-            </div>
-          </div>
+
 
           <div className="detail-calendar animate-fade-in-up delay-2">
             <div className="detail-calendar-header">
@@ -138,17 +118,39 @@ export default function MemberDetailPage() {
 
                     </div>
                     <div className="detail-meal">
-                      {dayData?.morning ? <span className="meal-dot morning"></span> : '-'}
+                      {dayData?.morning ? <span className="meal-dot morning"></span> : <span style={{ color: 'var(--color-text-secondary)', fontWeight: 'bold', fontSize: '1.2rem' }}>-</span>}
                     </div>
                     <div className="detail-meal">
-                      {dayData?.afternoon ? <span className="meal-dot afternoon"></span> : '-'}
+                      {dayData?.afternoon ? <span className="meal-dot afternoon"></span> : <span style={{ color: 'var(--color-text-secondary)', fontWeight: 'bold', fontSize: '1.2rem' }}>-</span>}
                     </div>
                     <div className="detail-meal">
-                      {dayData?.night ? <span className="meal-dot night"></span> : '-'}
+                      {dayData?.night ? <span className="meal-dot night"></span> : <span style={{ color: 'var(--color-text-secondary)', fontWeight: 'bold', fontSize: '1.2rem' }}>-</span>}
                     </div>
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          <div style={{ marginTop: '24px', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '12px', overflow: 'hidden', marginBottom: '32px' }}>
+            <div style={{ display: 'flex', padding: '16px', borderBottom: '1px solid var(--color-border)' }}>
+              <span style={{ flex: 1, fontWeight: 'bold' }}>☀️ Morning</span>
+              <span style={{ width: '60px', textAlign: 'center' }}>{memberSummary?.morning_count || 0}</span>
+              <span style={{ width: '80px', textAlign: 'right', fontWeight: 'bold' }}>₹{memberSummary?.morning_cost || 0}</span>
+            </div>
+            <div style={{ display: 'flex', padding: '16px', borderBottom: '1px solid var(--color-border)' }}>
+              <span style={{ flex: 1, fontWeight: 'bold' }}>🌤️ Afternoon</span>
+              <span style={{ width: '60px', textAlign: 'center' }}>{memberSummary?.afternoon_count || 0}</span>
+              <span style={{ width: '80px', textAlign: 'right', fontWeight: 'bold' }}>₹{memberSummary?.afternoon_cost || 0}</span>
+            </div>
+            <div style={{ display: 'flex', padding: '16px', borderBottom: '1px solid var(--color-border)' }}>
+              <span style={{ flex: 1, fontWeight: 'bold' }}>🌙 Night</span>
+              <span style={{ width: '60px', textAlign: 'center' }}>{memberSummary?.night_count || 0}</span>
+              <span style={{ width: '80px', textAlign: 'right', fontWeight: 'bold' }}>₹{memberSummary?.night_cost || 0}</span>
+            </div>
+            <div style={{ display: 'flex', padding: '16px', backgroundColor: 'rgba(16, 185, 129, 0.12)', color: 'var(--primary)' }}>
+              <span style={{ flex: 1, fontWeight: '800', fontSize: '1.1rem', textTransform: 'uppercase' }}>This Month</span>
+              <span style={{ width: '80px', textAlign: 'right', fontWeight: '800', fontSize: '1.2rem' }}>₹{memberSummary?.total_cost || 0}</span>
             </div>
           </div>
         </>

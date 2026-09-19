@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useColorScheme, Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system/legacy';
 import { ThemeContext, darkColors, lightColors, type ThemeMode } from './theme';
-
-const SETTINGS_FILE = Platform.OS !== 'web' ? FileSystem.documentDirectory + 'theme_settings.json' : '';
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>('system');
@@ -19,9 +16,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
             setModeState(stored as ThemeMode);
           }
         } else {
-          const info = await FileSystem.getInfoAsync(SETTINGS_FILE);
+          const FileSystem = require('expo-file-system/legacy');
+          const file = FileSystem.documentDirectory + 'theme_settings.json';
+          const info = await FileSystem.getInfoAsync(file);
           if (info.exists) {
-            const content = await FileSystem.readAsStringAsync(SETTINGS_FILE);
+            const content = await FileSystem.readAsStringAsync(file);
             const parsed = JSON.parse(content);
             if (parsed.mode) {
               setModeState(parsed.mode);
@@ -43,7 +42,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       if (Platform.OS === 'web') {
         window.localStorage.setItem('theme_mode', newMode);
       } else {
-        await FileSystem.writeAsStringAsync(SETTINGS_FILE, JSON.stringify({ mode: newMode }));
+        const FileSystem = require('expo-file-system/legacy');
+        const file = FileSystem.documentDirectory + 'theme_settings.json';
+        await FileSystem.writeAsStringAsync(file, JSON.stringify({ mode: newMode }));
       }
     } catch (e) {
       console.error('Failed to save theme mode', e);

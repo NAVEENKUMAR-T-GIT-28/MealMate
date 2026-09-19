@@ -1,594 +1,231 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  Pressable,
+  TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { format, getDaysInMonth } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
-import { THEME, useAppTheme, type ThemeColors } from '@/utils/theme';
-import { formatMonth } from '@/utils/dateHelpers';
-import { format, parseISO } from 'date-fns';
-import {
-  getMemberMonthlyDetails,
-  type MemberMonthlyDetailsData,
-  type DayDetail,
-} from '@/db/memberMonthlyDetails.service';
+import { THEME, useAppTheme } from '@/utils/theme';
+import { useGroup } from '@/context/GroupContext';
+import { useSummaryQuery } from '@/hooks/useSummaryQuery';
+import { useAttendanceMonthQuery } from '@/hooks/useAttendanceQuery';
+import { formatMonth, getPrevMonth, getNextMonth, currentMonthStr } from '@/utils/dateHelpers';
 
-// ─── Helpers ──────────────────────────────────────────────
-function getInitial(name: string): string {
-  return name.charAt(0).toUpperCase();
-}
-
-function formatDayDate(dateStr: string): string {
-  try {
-    return format(parseISO(dateStr), 'dd/MM/yyyy');
-  } catch {
-    return dateStr;
-  }
-}
-
-// ─── Avatar colours (rotating palette) ───────────────────
-const AVATAR_COLORS = [
-  '#10B981', '#6366F1', '#F59E0B', '#EF4444',
-  '#3B82F6', '#EC4899', '#8B5CF6', '#14B8A6',
-];
-
-function avatarColor(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
-
-// ─── Screen ──────────────────────────────────────────────
-export default function MemberMonthlyDetailsScreen() {
+export default function MemberDetailScreen() {
   const colors = useAppTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-
-  const { memberId, month: paramMonth } = useLocalSearchParams<{
-    memberId: string;
-    month: string;
-  }>();
   const router = useRouter();
-
-  const [month, setMonth] = useState(paramMonth ?? '');
-  const [data, setData] = useState<MemberMonthlyDetailsData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const loadData = useCallback(async () => {
-    if (!memberId) return;
-    setLoading(true);
-    try {
-      const result = await getMemberMonthlyDetails(Number(memberId), month);
-      setData(result);
-    } catch (e) {
-      console.error('Failed to load member details:', e);
-    } finally {
-      setLoading(false);
-    }
-  }, [memberId, month]);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-    }, [loadData])
+  const params = useLocalSearchParams<{ memberId: string; month: string }>();
+  
+  const [selectedMonth, setSelectedMonth] = useState<string>(
+    params.month || currentMonthStr()
   );
 
-  // ─── Month navigation ──────────────────────────────────
-  const goToPrevMonth = () => {
-    const [y, m] = month.split('-').map(Number);
-    const prevMonth = m === 1 ? 12 : m - 1;
-    const prevYear = m === 1 ? y - 1 : y;
-    setMonth(`${prevYear}-${String(prevMonth).padStart(2, '0')}`);
-  };
+  const { currentGroup } = useGroup();
+  const groupId = currentGroup?.id;
 
-  const goToNextMonth = () => {
-    const [y, m] = month.split('-').map(Number);
-    const nextMonth = m === 12 ? 1 : m + 1;
-    const nextYear = m === 12 ? y + 1 : y;
-    setMonth(`${nextYear}-${String(nextMonth).padStart(2, '0')}`);
-  };
+  const {
+    data: summaryData,
+    isLoading: summaryLoading,
+  } = useSummaryQuery(groupId, selectedMonth, !!currentGroup);
 
-  // ─── Loading state ─────────────────────────────────────
-  if (loading) {
+  const {
+    data: monthAttendance = [],
+    isLoading: attendanceLoading,
+  } = useAttendanceMonthQuery(groupId, selectedMonth, params.memberId);
+
+  const isLoading = summaryLoading || attendanceLoading;
+
+  const memberSummary = useMemo(() => {
+    if (!summaryData) return null;
+    return summaryData.members.find((m: any) => String(m.member_id) === params.memberId || String(m.user_id) === params.memberId) || {
+      morning_count: 0, afternoon_count: 0, night_count: 0,
+      total_morning: 0, total_afternoon: 0, total_night: 0,
+      total_cost: 0
+    };
+  }, [summaryData, params.memberId]);
+
+  if (!isLoading && (!summaryData || !summaryData.members.find((m: any) => String(m.member_id) === params.memberId || String(m.user_id) === params.memberId))) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+        <Text style={{ fontSize: 48 }}>🤔</Text>
+        <Text style={[styles.emptyTitle, { color: colors.text }]}>Member Not Found</Text>
+        <TouchableOpacity style={[styles.backBtnLarge, { backgroundColor: colors.primary }]} onPress={() => router.back()}>
+          <Text style={styles.backBtnLargeText}>Back to Summary</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
-  if (!data) {
-    return (
-      <View style={[styles.container, styles.centered]}>
-        <Ionicons name="person-outline" size={64} color={colors.textDim} />
-        <Text style={styles.emptyTitle}>Member Not Found</Text>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={20} color={colors.text} />
-          <Text style={styles.backBtnText}>Go Back</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
-  const bgColor = avatarColor(data.member.name);
+  // Generate calendar days for the month
+  const monthDays = useMemo(() => {
+    const [year, m] = selectedMonth.split('-');
+    const daysInMonth = getDaysInMonth(new Date(Number(year), Number(m) - 1));
+    return Array.from({ length: daysInMonth }, (_, i) => {
+      const day = String(i + 1).padStart(2, '0');
+      return `${selectedMonth}-${day}`;
+    });
+  }, [selectedMonth]);
 
   return (
-    <View style={styles.container}>
-      {/* ────── HEADER ────── */}
-      <Animated.View entering={FadeIn.duration(300)} style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Pressable
-            onPress={() => router.back()}
-            style={styles.headerBackBtn}
-            hitSlop={12}
-          >
-            <Ionicons name="chevron-back" size={26} color={colors.text} />
-          </Pressable>
-
-          <View style={[styles.avatar, { backgroundColor: bgColor }]}>
-            <Text style={styles.avatarText}>{getInitial(data.member.name)}</Text>
-          </View>
-
-          <View style={styles.headerInfo}>
-            <Text style={styles.headerName} numberOfLines={1}>
-              {data.member.name}
-            </Text>
-            <Text style={styles.headerMonth}>{formatMonth(month)}</Text>
-          </View>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.contentContainer}>
+      
+      {/* Header */}
+      <View style={[styles.headerRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <View style={styles.headerInfo}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{(memberSummary as any)?.name || (memberSummary as any)?.full_name || (memberSummary as any)?.member_name || 'Member'}</Text>
+          {(memberSummary as any)?.role && (
+            <View style={[styles.roleBadge, { borderColor: colors.primary }]}>
+              <Text style={[styles.roleText, { color: colors.primary }]}>{(memberSummary as any).role.toUpperCase()}</Text>
+            </View>
+          )}
         </View>
+      </View>
 
-        <Pressable onPress={() => {}} style={styles.changeMonthBtn}>
-          <View style={styles.changeMonthRow}>
-            <View style={styles.monthNavBtns}>
-              <Pressable onPress={goToPrevMonth} hitSlop={8} style={styles.monthArrow}>
-                <Ionicons name="chevron-back" size={18} color={colors.primary} />
-              </Pressable>
-              <Pressable onPress={goToNextMonth} hitSlop={8} style={styles.monthArrow}>
-                <Ionicons name="chevron-forward" size={18} color={colors.primary} />
-              </Pressable>
+      {/* Month Navigator */}
+      <View style={[styles.navCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <TouchableOpacity style={styles.navBtn} onPress={() => setSelectedMonth(getPrevMonth(selectedMonth))}>
+          <Ionicons name="chevron-back" size={20} color={colors.primary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => setSelectedMonth(currentMonthStr())} style={styles.monthLabelContainer}>
+          <Text style={[styles.monthLabel, { color: colors.text }]}>{formatMonth(selectedMonth)}</Text>
+          <Text style={[styles.resetText, { color: colors.primary }]}>Today</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.navBtn} onPress={() => setSelectedMonth(getNextMonth(selectedMonth))}>
+          <Ionicons name="chevron-forward" size={20} color={colors.primary} />
+        </TouchableOpacity>
+      </View>
+
+      {isLoading && !memberSummary ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading details...</Text>
+        </View>
+      ) : (
+        <>
+
+
+          {/* Calendar Table */}
+          <View style={[styles.calendarTable, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.calendarHeader, { backgroundColor: 'rgba(16, 185, 129, 0.12)', borderBottomColor: colors.border }]}>
+              <Text style={[styles.calHeadText, styles.colDate, { color: colors.text }]}>Date</Text>
+              <Text style={[styles.calHeadText, styles.colMeal, { color: colors.morning || '#F59E0B' }]}>☀️ M</Text>
+              <Text style={[styles.calHeadText, styles.colMeal, { color: colors.afternoon || '#F97316' }]}>🌤️ A</Text>
+              <Text style={[styles.calHeadText, styles.colMeal, { color: colors.night || '#6366F1' }]}>🌙 N</Text>
+            </View>
+
+            {monthDays.map((dateStr, idx) => {
+              const dayData = monthAttendance.find((a: any) => a.date === dateStr);
+              const d = new Date(dateStr);
+              const isFuture = d > new Date();
+
+              return (
+                <View 
+                  key={dateStr} 
+                  style={[
+                    styles.calendarRow, 
+                    { borderBottomColor: colors.border },
+                    idx === monthDays.length - 1 && { borderBottomWidth: 0 },
+                    isFuture && { opacity: 0.5 }
+                  ]}
+                >
+                  <View style={[styles.colDate, { flexDirection: 'row', alignItems: 'center' }]}>
+                    <Text style={[styles.calRowText, { color: colors.text }]}>{format(d, 'dd/MM/yyyy')}  </Text>
+                    <Text style={[styles.calRowDay, { color: colors.textMuted }]}>{format(d, 'EEE').toUpperCase()}</Text>
+                  </View>
+                  
+                  <View style={styles.colMeal}>
+                    {dayData?.morning ? <View style={[styles.dot, { backgroundColor: colors.morning || '#F59E0B' }]} /> : <Text style={{ color: colors.textMuted, fontSize: 18, fontWeight: '600' }}>-</Text>}
+                  </View>
+                  <View style={styles.colMeal}>
+                    {dayData?.afternoon ? <View style={[styles.dot, { backgroundColor: colors.afternoon || '#F97316' }]} /> : <Text style={{ color: colors.textMuted, fontSize: 18, fontWeight: '600' }}>-</Text>}
+                  </View>
+                  <View style={styles.colMeal}>
+                    {dayData?.night ? <View style={[styles.dot, { backgroundColor: colors.night || '#6366F1' }]} /> : <Text style={{ color: colors.textMuted, fontSize: 18, fontWeight: '600' }}>-</Text>}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+          
+          <View style={{ marginTop: THEME.spacing.xl, borderRadius: THEME.radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, overflow: 'hidden' }}>
+            <View style={{ flexDirection: 'row', padding: THEME.spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+              <Text style={{ flex: 1, fontWeight: '700', color: colors.text }}>☀️ Morning</Text>
+              <Text style={{ width: 60, textAlign: 'center', color: colors.text }}>{(memberSummary as any)?.morning_count ?? (memberSummary as any)?.total_morning ?? 0}</Text>
+              <Text style={{ width: 80, textAlign: 'right', fontWeight: '700', color: colors.text }}>₹{(memberSummary as any)?.morning_cost ?? 0}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', padding: THEME.spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+              <Text style={{ flex: 1, fontWeight: '700', color: colors.text }}>🌤️ Afternoon</Text>
+              <Text style={{ width: 60, textAlign: 'center', color: colors.text }}>{(memberSummary as any)?.afternoon_count ?? (memberSummary as any)?.total_afternoon ?? 0}</Text>
+              <Text style={{ width: 80, textAlign: 'right', fontWeight: '700', color: colors.text }}>₹{(memberSummary as any)?.afternoon_cost ?? 0}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', padding: THEME.spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+              <Text style={{ flex: 1, fontWeight: '700', color: colors.text }}>🌙 Night</Text>
+              <Text style={{ width: 60, textAlign: 'center', color: colors.text }}>{(memberSummary as any)?.night_count ?? (memberSummary as any)?.total_night ?? 0}</Text>
+              <Text style={{ width: 80, textAlign: 'right', fontWeight: '700', color: colors.text }}>₹{(memberSummary as any)?.night_cost ?? 0}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', padding: THEME.spacing.md, backgroundColor: 'rgba(16, 185, 129, 0.12)' }}>
+              <Text style={{ flex: 1, fontWeight: '800', fontSize: 16, textTransform: 'uppercase', color: colors.primary }}>This Month</Text>
+              <Text style={{ width: 100, textAlign: 'right', fontWeight: '800', fontSize: 18, color: colors.primary }}>₹{(memberSummary?.total_cost || 0).toLocaleString()}</Text>
             </View>
           </View>
-        </Pressable>
-      </Animated.View>
-
-      {/* ────── SCROLLABLE CONTENT ────── */}
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ────── SUMMARY CARDS ────── */}
-        <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.cardsGrid}>
-          {/* Morning */}
-          <View style={[styles.statCard, { borderColor: colors.morningBg }]}>
-            <View style={[styles.statIcon, { backgroundColor: colors.morningBg }]}>
-              <Text style={styles.statEmoji}>☀️</Text>
-            </View>
-            <Text style={[styles.statCount, { color: colors.morning }]}>
-              {data.morningCount}
-            </Text>
-            <Text style={styles.statLabel}>Morning</Text>
-            <Text style={[styles.statAmount, { color: colors.morning }]}>
-              ₹{data.morningTotal.toLocaleString()}
-            </Text>
-          </View>
-
-          {/* Afternoon */}
-          <View style={[styles.statCard, { borderColor: colors.afternoonBg }]}>
-            <View style={[styles.statIcon, { backgroundColor: colors.afternoonBg }]}>
-              <Text style={styles.statEmoji}>🌤️</Text>
-            </View>
-            <Text style={[styles.statCount, { color: colors.afternoon }]}>
-              {data.afternoonCount}
-            </Text>
-            <Text style={styles.statLabel}>Afternoon</Text>
-            <Text style={[styles.statAmount, { color: colors.afternoon }]}>
-              ₹{data.afternoonTotal.toLocaleString()}
-            </Text>
-          </View>
-
-          {/* Night */}
-          <View style={[styles.statCard, { borderColor: colors.nightBg }]}>
-            <View style={[styles.statIcon, { backgroundColor: colors.nightBg }]}>
-              <Text style={styles.statEmoji}>🌙</Text>
-            </View>
-            <Text style={[styles.statCount, { color: colors.night }]}>
-              {data.nightCount}
-            </Text>
-            <Text style={styles.statLabel}>Night</Text>
-            <Text style={[styles.statAmount, { color: colors.night }]}>
-              ₹{data.nightTotal.toLocaleString()}
-            </Text>
-          </View>
-
-          {/* Grand Total */}
-          <View style={[styles.statCard, styles.totalCard]}>
-            <View style={[styles.statIcon, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
-              <Ionicons name="wallet-outline" size={20} color={colors.primary} />
-            </View>
-            <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalAmount}>
-              ₹{data.grandTotal.toLocaleString()}
-            </Text>
-          </View>
-        </Animated.View>
-
-        {/* ────── DAILY TABLE ────── */}
-        <Animated.View entering={FadeInDown.delay(250).duration(400)} style={styles.tableWrapper}>
-          {/* Table header */}
-          <View style={styles.tableHeader}>
-            <Text style={[styles.thCell, styles.dateCol]}>Date</Text>
-            <Text style={[styles.thCell, styles.mealCol, { color: colors.morning }]}>
-              ☀️ Morning{'\n'}
-              <Text style={styles.priceHint}>(₹{data.prices.morning})</Text>
-            </Text>
-            <Text style={[styles.thCell, styles.mealCol, { color: colors.afternoon }]}>
-              🌤️ Afternoon{'\n'}
-              <Text style={styles.priceHint}>(₹{data.prices.afternoon})</Text>
-            </Text>
-            <Text style={[styles.thCell, styles.mealCol, { color: colors.night }]}>
-              🌙 Night{'\n'}
-              <Text style={styles.priceHint}>(₹{data.prices.night})</Text>
-            </Text>
-            <Text style={[styles.thCell, styles.totalCol, { color: colors.primary }]}>
-              Total (₹)
-            </Text>
-          </View>
-
-          {/* Table rows */}
-          {data.days.map((day, idx) => (
-            <DayRow key={day.date} day={day} isEven={idx % 2 === 0} styles={styles} colors={colors} />
-          ))}
-        </Animated.View>
-
-        {/* ────── BOTTOM MONTHLY TOTAL ────── */}
-        <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.bottomCard}>
-          <View style={styles.bottomLeft}>
-            <View style={[styles.statIcon, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
-              <Text style={{ fontSize: 18, color: colors.primary }}>₹</Text>
-            </View>
-            <View>
-              <Text style={styles.bottomLabel}>Monthly Total</Text>
-              <Text style={styles.bottomSub}>
-                (Up to {data.days.length > 0 ? format(parseISO(data.days[data.days.length - 1].date), 'dd MMM yyyy') : '—'})
-              </Text>
-            </View>
-          </View>
-          <Text style={styles.bottomAmount}>
-            ₹{data.grandTotal.toLocaleString()}
-          </Text>
-        </Animated.View>
-      </ScrollView>
-    </View>
+        </>
+      )}
+    </ScrollView>
   );
 }
 
-// ─── Day Row Component ───────────────────────────────────
-function DayRow({ day, isEven, styles, colors }: { day: DayDetail; isEven: boolean; styles: any; colors: ThemeColors }) {
-  return (
-    <View style={[styles.tableRow, isEven ? styles.rowEven : styles.rowOdd]}>
-      <Text style={[styles.tdCell, styles.dateCol, styles.dateText]}>
-        {formatDayDate(day.date)}
-      </Text>
-      <View style={[styles.mealCol, styles.mealCell]}>
-        <MealIcon ate={day.morning} styles={styles} colors={colors} />
-      </View>
-      <View style={[styles.mealCol, styles.mealCell]}>
-        <MealIcon ate={day.afternoon} styles={styles} colors={colors} />
-      </View>
-      <View style={[styles.mealCol, styles.mealCell]}>
-        <MealIcon ate={day.night} styles={styles} colors={colors} />
-      </View>
-      <Text style={[styles.tdCell, styles.totalCol, styles.dayTotalText]}>
-        ₹{day.dayTotal}
-      </Text>
-    </View>
-  );
-}
-
-// ─── Meal Attendance Icon ────────────────────────────────
-function MealIcon({ ate, styles, colors }: { ate: boolean; styles: any; colors: ThemeColors }) {
-  return (
-    <View
-      style={[
-        styles.mealIconCircle,
-        { backgroundColor: ate ? 'rgba(16, 185, 129, 0.18)' : 'rgba(239, 68, 68, 0.15)' },
-      ]}
-    >
-      <Ionicons
-        name={ate ? 'checkmark' : 'close'}
-        size={16}
-        color={ate ? colors.primary : colors.danger}
-      />
-    </View>
-  );
-}
-
-// ─── Styles ──────────────────────────────────────────────
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  centered: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: THEME.spacing.md,
-  },
-  emptyTitle: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  backBtn: {
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  contentContainer: { padding: THEME.spacing.lg, gap: THEME.spacing.lg, paddingBottom: THEME.spacing.xl * 2 },
+  centerContainer: { justifyContent: 'center', alignItems: 'center', paddingVertical: 48, flex: 1 },
+  emptyTitle: { fontSize: 20, fontWeight: '700', marginTop: THEME.spacing.md },
+  backBtnLarge: { marginTop: THEME.spacing.lg, paddingHorizontal: 24, paddingVertical: 12, borderRadius: THEME.radius.md },
+  backBtnLargeText: { color: '#FFF', fontWeight: '600' },
+  loadingText: { marginTop: THEME.spacing.md, fontSize: 14 },
+  
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: THEME.spacing.xs,
-    marginTop: THEME.spacing.md,
-    paddingHorizontal: THEME.spacing.lg,
-    paddingVertical: THEME.spacing.sm,
-    backgroundColor: colors.card,
-    borderRadius: THEME.radius.full,
-  },
-  backBtnText: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
-  // ─── Header ─────────────────────────────────────────
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: THEME.spacing.lg,
-    paddingTop: 54,
-    paddingBottom: THEME.spacing.lg,
-    backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: THEME.spacing.md,
-    flex: 1,
-  },
-  headerBackBtn: {
-    padding: THEME.spacing.xs,
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  headerInfo: {
-    flex: 1,
-  },
-  headerName: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  headerMonth: {
-    color: colors.textMuted,
-    fontSize: 13,
-    marginTop: 2,
-  },
-  changeMonthBtn: {
-    marginLeft: THEME.spacing.sm,
-  },
-  changeMonthRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: THEME.spacing.xs,
-  },
-  monthNavBtns: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderRadius: THEME.radius.full,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    paddingHorizontal: THEME.spacing.xs,
-    paddingVertical: THEME.spacing.xs,
-    gap: THEME.spacing.sm,
-  },
-  monthArrow: {
-    padding: THEME.spacing.xs,
-  },
-
-  // ─── Scroll ─────────────────────────────────────────
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: THEME.spacing.lg,
-    paddingBottom: THEME.spacing.xxxl + 40,
-  },
-
-  // ─── Summary Cards ──────────────────────────────────
-  cardsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: THEME.spacing.md,
-    marginBottom: THEME.spacing.xl,
-  },
-  statCard: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: colors.card,
-    borderRadius: THEME.radius.xl,
-    padding: THEME.spacing.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: THEME.spacing.xs,
-  },
-  totalCard: {
-    borderColor: colors.primary,
-  },
-  statIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: THEME.spacing.xs,
-  },
-  statEmoji: {
-    fontSize: 18,
-  },
-  statCount: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  statLabel: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  statAmount: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  totalLabel: {
-    color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: '500',
-    marginTop: THEME.spacing.xs,
-  },
-  totalAmount: {
-    color: colors.primary,
-    fontSize: 28,
-    fontWeight: '700',
-  },
-
-  // ─── Table ──────────────────────────────────────────
-  tableWrapper: {
+    padding: THEME.spacing.md,
     borderRadius: THEME.radius.lg,
-    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: THEME.spacing.xl,
   },
-  tableHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.10)',
-    paddingVertical: THEME.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  thCell: {
-    fontWeight: '700',
-    fontSize: 12,
-    color: colors.text,
-    textAlign: 'center',
-  },
-  priceHint: {
-    fontWeight: '400',
-    fontSize: 10,
-    color: colors.textDim,
-  },
-  tableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: THEME.spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  rowEven: {
-    backgroundColor: colors.card,
-  },
-  rowOdd: {
-    backgroundColor: colors.background, // Used background instead of hardcoded dark
-  },
-  tdCell: {
-    fontSize: 13,
-    color: colors.textMuted,
-    textAlign: 'center',
-  },
-  dateCol: {
-    width: '22%',
-    paddingLeft: THEME.spacing.md,
-    textAlign: 'left',
-  },
-  mealCol: {
-    width: '18%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mealCell: {
-    flexDirection: 'row',
-  },
-  totalCol: {
-    width: '24%',
-    paddingRight: THEME.spacing.md,
-    textAlign: 'right',
-  },
-  dateText: {
-    fontWeight: '500',
-    fontSize: 12,
-    color: colors.textMuted,
-  },
-  dayTotalText: {
-    color: colors.primary,
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  mealIconCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  backBtn: { marginRight: THEME.spacing.md },
+  headerInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerTitle: { fontSize: 18, fontWeight: '700' },
+  roleBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: THEME.radius.full, borderWidth: 1 },
+  roleText: { fontSize: 10, fontWeight: '700' },
 
-  // ─── Bottom Card ────────────────────────────────────
-  bottomCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.card,
-    borderRadius: THEME.radius.xl,
-    padding: THEME.spacing.xxl,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  bottomLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: THEME.spacing.md,
-  },
-  bottomLabel: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  bottomSub: {
-    color: colors.textDim,
-    fontSize: 11,
-    marginTop: 2,
-  },
-  bottomAmount: {
-    color: colors.primary,
-    fontSize: 28,
-    fontWeight: '700',
-  },
+  navCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: THEME.spacing.md, borderRadius: THEME.radius.lg, borderWidth: 1 },
+  navBtn: { padding: THEME.spacing.sm },
+  monthLabelContainer: { alignItems: 'center' },
+  monthLabel: { fontSize: 16, fontWeight: '700' },
+  resetText: { fontSize: 11, fontWeight: '600', marginTop: 2 },
+
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: THEME.spacing.sm },
+  statCard: { flex: 1, minWidth: '45%', padding: THEME.spacing.md, borderRadius: THEME.radius.lg, borderWidth: 1, alignItems: 'center' },
+  statEmoji: { fontSize: 24, marginBottom: 4 },
+  statValue: { fontSize: 20, fontWeight: '700' },
+  statLabel: { fontSize: 14, fontWeight: '600', marginBottom: 4 },
+  statTotalValue: { fontSize: 22, fontWeight: '800' },
+
+  calendarTable: { borderRadius: THEME.radius.lg, borderWidth: 1, overflow: 'hidden' },
+  calendarHeader: { flexDirection: 'row', borderBottomWidth: 1, paddingVertical: 12, paddingHorizontal: THEME.spacing.md },
+  calHeadText: { fontWeight: '700', fontSize: 13 },
+  calendarRow: { flexDirection: 'row', borderBottomWidth: 1, paddingVertical: 12, paddingHorizontal: THEME.spacing.md, alignItems: 'center' },
+  calRowText: { fontSize: 14, fontWeight: '500' },
+  calRowDay: { fontSize: 12 },
+  colDate: { flex: 1 },
+  colMeal: { width: 48, alignItems: 'center' },
+  dot: { width: 12, height: 12, borderRadius: 6 },
 });

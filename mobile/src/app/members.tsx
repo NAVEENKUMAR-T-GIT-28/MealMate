@@ -1,701 +1,439 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
   FlatList,
-  Pressable,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Modal,
+  Modal
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
-import Animated, { FadeIn, FadeInLeft, FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { THEME, useAppTheme, type ThemeColors } from '@/utils/theme';
-import { formatDateDisplay } from '@/utils/dateHelpers';
-import {
-  getAllMembers,
-  addMember,
-  deactivateMember,
-  reactivateMember,
-  renameMember,
-  deleteMember,
-  type Member,
-} from '@/db/members.repo';
-
-// ─── Avatar colours (same palette used across app) ───────
-const AVATAR_COLORS = [
-  '#10B981', '#6366F1', '#F59E0B', '#EF4444',
-  '#3B82F6', '#EC4899', '#8B5CF6', '#14B8A6',
-];
-function avatarColor(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
+import * as Clipboard from 'expo-clipboard';
+import { THEME, useAppTheme } from '@/utils/theme';
+import { useAuth } from '@/context/AuthContext';
+import { useGroup } from '@/context/GroupContext';
+import { useGroupMembersQuery } from '@/hooks/useGroupMembersQuery';
+import { updateMemberStatus, removeMember } from '@/api/groups';
+import { GroupMember } from '@/api/members';
+import { useQueryClient } from '@tanstack/react-query';
+import { format } from 'date-fns';
+import { useRouter } from 'expo-router';
 
 export default function MembersScreen() {
   const colors = useAppTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { user } = useAuth();
+  const { currentGroup, isAdmin, admitMember, isLoading: isGroupLoading } = useGroup();
+  const queryClient = useQueryClient();
+  const router = useRouter();
 
-  const [members, setMembers] = useState<Member[]>([]);
-  const [newName, setNewName] = useState('');
+  const {
+    data: membersData,
+    isLoading: isMembersLoading,
+    isError,
+    refetch,
+  } = useGroupMembersQuery(currentGroup?.id, !!currentGroup);
 
-  // ─── Rename modal state ─────────────────────────────
-  const [renameModalVisible, setRenameModalVisible] = useState(false);
-  const [renamingMember, setRenamingMember] = useState<Member | null>(null);
-  const [renameText, setRenameText] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modalConfig, setModalConfig] = useState<{
+    visible: boolean;
+    type: 'toggle_status' | 'remove' | 'allow' | 'deny' | null;
+    member?: GroupMember;
+    title: string;
+    message: string;
+    confirmText: string;
+    isDanger: boolean;
+  }>({
+    visible: false,
+    type: null,
+    title: '',
+    message: '',
+    confirmText: '',
+    isDanger: false,
+  });
 
-  const loadMembers = useCallback(async () => {
-    const all = await getAllMembers();
-    setMembers(all);
-  }, []);
+  const closeModal = () => setModalConfig({ ...modalConfig, visible: false, member: undefined });
 
-  useFocusEffect(
-    useCallback(() => {
-      loadMembers();
-    }, [loadMembers])
-  );
+  const allMembers = membersData ?? [];
+  
+  const pendingMembers = useMemo(() => allMembers.filter(m => m.role === 'pending'), [allMembers]);
+  const regularMembers = useMemo(() => allMembers.filter(m => m.role !== 'pending'), [allMembers]);
+  
+  const totalCount = regularMembers.length;
+  const activeCount = regularMembers.filter(m => m.is_active).length;
+  const inactiveCount = totalCount - activeCount;
 
-  // ─── Add ────────────────────────────────────────────
-  const handleAdd = async () => {
-    const name = newName.trim();
-    if (!name) {
-      Alert.alert('Enter a name', 'Please type a member name first.');
+  const handleCopyCode = async () => {
+    if (currentGroup?.invite_code) {
+      await Clipboard.setStringAsync(currentGroup.invite_code);
+      Alert.alert('Copied!', 'Invite code copied to clipboard.', [{ text: 'OK' }]);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    const webUrl = process.env.EXPO_PUBLIC_WEB_URL || 'http://localhost:5173';
+    if (!webUrl) {
+      Alert.alert('Configuration Error', 'Web URL is not configured. Cannot generate invite link.');
       return;
     }
-    await addMember(name);
-    setNewName('');
-    await loadMembers();
-  };
-
-  // ─── Toggle Active / Inactive ───────────────────────
-  const handleToggleActive = (member: Member) => {
-    if (member.is_active) {
-      Alert.alert(
-        'Deactivate Member',
-        `Remove "${member.name}" from daily marking? Their history will be preserved.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Deactivate',
-            style: 'destructive',
-            onPress: async () => {
-              await deactivateMember(member.id);
-              await loadMembers();
-            },
-          },
-        ]
-      );
-    } else {
-      Alert.alert(
-        'Reactivate Member',
-        `Bring "${member.name}" back to daily marking?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Reactivate',
-            onPress: async () => {
-              await reactivateMember(member.id);
-              await loadMembers();
-            },
-          },
-        ]
-      );
+    if (currentGroup?.invite_code) {
+      const link = `${webUrl}/groups?code=${currentGroup.invite_code}`;
+      await Clipboard.setStringAsync(link);
+      Alert.alert('Copied!', 'Invite link copied to clipboard.', [{ text: 'OK' }]);
     }
   };
 
-  // ─── Rename ─────────────────────────────────────────
-  const openRenameModal = (member: Member) => {
-    setRenamingMember(member);
-    setRenameText(member.name);
-    setRenameModalVisible(true);
+  const confirmAction = async () => {
+    if (!modalConfig.member || !currentGroup) return;
+    setIsSubmitting(true);
+    
+    try {
+      if (modalConfig.type === 'toggle_status') {
+        await updateMemberStatus(currentGroup.id, modalConfig.member.user_id, !modalConfig.member.is_active);
+      } else if (modalConfig.type === 'remove' || modalConfig.type === 'deny') {
+        await removeMember(currentGroup.id, modalConfig.member.user_id);
+      } else if (modalConfig.type === 'allow') {
+        await admitMember(modalConfig.member.user_id);
+      }
+      
+      await queryClient.invalidateQueries({ queryKey: ['members', currentGroup.id] });
+      closeModal();
+    } catch (error: any) {
+      Alert.alert('Action Failed', error?.response?.data?.error || 'An error occurred while updating member.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleRename = async () => {
-    const trimmed = renameText.trim();
-    if (!trimmed || !renamingMember) return;
-    await renameMember(renamingMember.id, trimmed);
-    setRenameModalVisible(false);
-    setRenamingMember(null);
-    setRenameText('');
-    await loadMembers();
+  const openToggleModal = (member: GroupMember) => {
+    setModalConfig({
+      visible: true,
+      type: 'toggle_status',
+      member,
+      title: 'Change Member Status',
+      message: `Are you sure you want to mark ${member.name} as ${member.is_active ? 'inactive' : 'active'}?`,
+      confirmText: member.is_active ? 'Make Inactive' : 'Make Active',
+      isDanger: member.is_active,
+    });
   };
 
-  // ─── Delete ─────────────────────────────────────────
-  const handleDelete = (member: Member) => {
-    Alert.alert(
-      'Delete Member',
-      `Permanently delete "${member.name}" and ALL their meal history & payments?\n\nThis cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteMember(member.id);
-            await loadMembers();
-          },
-        },
-      ]
-    );
+  const openRemoveModal = (member: GroupMember) => {
+    setModalConfig({
+      visible: true,
+      type: 'remove',
+      member,
+      title: 'Remove Member',
+      message: `Are you sure you want to remove ${member.name} from the group? This cannot be undone.`,
+      confirmText: 'Remove',
+      isDanger: true,
+    });
   };
 
-  // ─── Stats ──────────────────────────────────────────
-  const activeCount = members.filter((m) => m.is_active).length;
-  const inactiveCount = members.length - activeCount;
-  const thisMonth = new Date();
-  const thisMonthStr = `${thisMonth.getFullYear()}-${String(thisMonth.getMonth() + 1).padStart(2, '0')}`;
-  const addedThisMonth = members.filter((m) => m.created_at >= `${thisMonthStr}-01`).length;
+  const openAllowModal = (member: GroupMember) => {
+    setModalConfig({
+      visible: true,
+      type: 'allow',
+      member,
+      title: 'Allow Member',
+      message: `Allow ${member.name} to join the group?`,
+      confirmText: 'Allow',
+      isDanger: false,
+    });
+  };
 
-  return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      {/* ────── HEADER ────── */}
-      <Animated.View entering={FadeIn.duration(300)} style={styles.headerSection}>
-        <View style={styles.headerLeft}>
-          <View style={styles.headerIcon}>
-            <Ionicons name="people" size={24} color={colors.primary} />
-          </View>
-          <View>
-            <Text style={styles.headerTitle}>Members</Text>
-            <Text style={styles.headerSub}>Manage your PG members</Text>
-          </View>
-        </View>
-        <Pressable onPress={() => {/* scroll to add input */}} style={styles.addHeaderBtn}>
-          <Ionicons name="add" size={18} color="#FFF" />
-          <Text style={styles.addHeaderText}>Add Member</Text>
-        </Pressable>
-      </Animated.View>
+  const openDenyModal = (member: GroupMember) => {
+    setModalConfig({
+      visible: true,
+      type: 'deny',
+      member,
+      title: 'Deny Request',
+      message: `Deny ${member.name}'s request to join?`,
+      confirmText: 'Deny',
+      isDanger: true,
+    });
+  };
 
-      {/* ────── STATS CARDS ────── */}
-      <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.statsRow}>
-        <View style={[styles.statCard, { borderColor: colors.primary }]}>
-          <View style={[styles.statIconCircle, { backgroundColor: 'rgba(16,185,129,0.15)' }]}>
-            <Ionicons name="people-outline" size={18} color={colors.primary} />
-          </View>
-          <Text style={[styles.statNumber, { color: colors.primary }]}>{activeCount}</Text>
-          <Text style={styles.statLabel}>Active{'\n'}Members</Text>
-        </View>
-        <View style={[styles.statCard, { borderColor: colors.info }]}>
-          <View style={[styles.statIconCircle, { backgroundColor: 'rgba(59,130,246,0.15)' }]}>
-            <Ionicons name="person-add-outline" size={18} color={colors.info} />
-          </View>
-          <Text style={[styles.statNumber, { color: colors.info }]}>{members.length}</Text>
-          <Text style={styles.statLabel}>Total{'\n'}Members</Text>
-        </View>
-        <View style={[styles.statCard, { borderColor: colors.warning }]}>
-          <View style={[styles.statIconCircle, { backgroundColor: 'rgba(245,158,11,0.15)' }]}>
-            <Ionicons name="person-remove-outline" size={18} color={colors.warning} />
-          </View>
-          <Text style={[styles.statNumber, { color: colors.warning }]}>{inactiveCount}</Text>
-          <Text style={styles.statLabel}>Inactive{'\n'}Members</Text>
-        </View>
-        <View style={[styles.statCard, { borderColor: colors.night }]}>
-          <View style={[styles.statIconCircle, { backgroundColor: 'rgba(99,102,241,0.15)' }]}>
-            <Ionicons name="calendar-outline" size={18} color={colors.night} />
-          </View>
-          <Text style={[styles.statNumber, { color: colors.night }]}>{addedThisMonth}</Text>
-          <Text style={styles.statLabel}>Added This{'\n'}Month</Text>
-        </View>
-      </Animated.View>
+  const renderHeader = () => {
+    if (!currentGroup) return null;
+    
+    const formattedDate = currentGroup.created_at ? format(new Date(currentGroup.created_at), 'MMM d, yyyy') : 'Unknown';
 
-      {/* ────── ADD MEMBER INPUT ────── */}
-      <View style={styles.addRow}>
-        <View style={styles.inputWrapper}>
-          <Ionicons name="person-outline" size={18} color={colors.textDim} style={styles.inputIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="Enter member name"
-            placeholderTextColor={colors.textDim}
-            value={newName}
-            onChangeText={setNewName}
-            onSubmitEditing={handleAdd}
-            returnKeyType="done"
-          />
-        </View>
-        <Pressable onPress={handleAdd} style={styles.addBtn}>
-          <Ionicons name="add" size={24} color="#FFF" />
-        </Pressable>
-      </View>
+    return (
+      <View style={{ marginBottom: THEME.spacing.lg }}>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.groupInfoRow}>
+            <View style={[styles.groupLogo, { backgroundColor: colors.primaryDark }]}>
+              <Ionicons name="people-outline" size={24} color="#FFFFFF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.groupName, { color: colors.text }]}>{currentGroup.name}</Text>
+              <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 2 }}>Created {formattedDate}</Text>
+            </View>
+          </View>
 
-      {/* ────── LIST HEADER ────── */}
-      <View style={styles.listHeader}>
-        <View style={styles.listHeaderLeft}>
-          <Ionicons name="people-outline" size={18} color={colors.primary} />
-          <Text style={styles.listHeaderText}>All Members ({members.length})</Text>
-        </View>
-      </View>
-
-      {/* ────── MEMBER LIST ────── */}
-      <FlatList
-        data={members}
-        keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="person-add-outline" size={64} color={colors.textDim} />
-            <Text style={styles.emptyTitle}>No Members</Text>
-            <Text style={styles.emptySubtitle}>
-              Add PG members above to start tracking meals
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          
+          <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 8 }]}>Invite Code</Text>
+          <View style={styles.inviteRow}>
+            <Text style={[styles.inviteCode, { color: colors.text, backgroundColor: colors.background, borderColor: colors.border }]}>
+              {currentGroup.invite_code}
             </Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.background, borderColor: colors.border }]} onPress={handleCopyCode}>
+                <Ionicons name="copy-outline" size={16} color={colors.text} />
+                <Text style={{ color: colors.text, fontSize: 13, fontWeight: '600' }}>Code</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.background, borderColor: colors.border }]} onPress={handleCopyLink}>
+                <Ionicons name="link-outline" size={16} color={colors.text} />
+                <Text style={{ color: colors.text, fontSize: 13, fontWeight: '600' }}>Link</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        }
-        renderItem={({ item, index }) => (
-          <Animated.View entering={FadeInLeft.delay(index * 50).springify()}>
-            <View
-              style={[
-                styles.memberCard,
-                !item.is_active && styles.memberCardInactive,
-              ]}
-            >
-              <View style={styles.memberLeft}>
-                <View style={[styles.avatar, { backgroundColor: avatarColor(item.name) }, !item.is_active && styles.avatarInactive]}>
-                  <Text style={styles.avatarText}>
-                    {item.name.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-                <View style={styles.memberInfo}>
-                  <Text
-                    style={[
-                      styles.memberName,
-                      !item.is_active && styles.memberNameInactive,
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {item.name}
-                  </Text>
-                  <View style={styles.memberMetaRow}>
-                    <Ionicons name="calendar-outline" size={11} color={colors.textDim} />
-                    <Text style={styles.memberMeta}>
-                      Joined on {formatDateDisplay(item.created_at)}
+        </View>
+
+        <View style={styles.statsRow}>
+          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.statValue, { color: colors.text }]}>{totalCount}</Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Total</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.statValue, { color: colors.primary }]}>{activeCount}</Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Active</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.statValue, { color: colors.warning || '#F59E0B' }]}>{inactiveCount}</Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Inactive</Text>
+          </View>
+        </View>
+
+        {isAdmin && pendingMembers.length > 0 && (
+          <View style={{ marginTop: THEME.spacing.md }}>
+            <View style={styles.sectionHeaderRow}>
+              <Ionicons name="time-outline" size={18} color={colors.warning || '#F59E0B'} />
+              <Text style={[styles.sectionTitle, { color: colors.warning || '#F59E0B' }]}>Pending Requests ({pendingMembers.length})</Text>
+            </View>
+            {pendingMembers.map((member) => (
+              <View key={member.user_id} style={[styles.memberCard, { backgroundColor: colors.card, borderColor: colors.border, borderLeftColor: colors.warning || '#F59E0B', borderLeftWidth: 4 }]}>
+                <View style={styles.memberLeft}>
+                  <View style={[styles.avatar, { backgroundColor: colors.textDim }]}>
+                    <Text style={styles.avatarText}>{member.name ? member.name.charAt(0).toUpperCase() : '?'}</Text>
+                  </View>
+                  <View style={styles.memberInfo}>
+                    <Text style={[styles.memberName, { color: colors.text }]}>{member.name}</Text>
+                    <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                      Requested {member.joined_at ? format(new Date(member.joined_at), 'MMM d') : ''}
                     </Text>
                   </View>
                 </View>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TouchableOpacity style={[styles.smallBtn, { backgroundColor: colors.primary }]} onPress={() => openAllowModal(member)}>
+                    <Ionicons name="checkmark" size={14} color="#FFF" />
+                    <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>Allow</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.smallBtnOutline, { borderColor: colors.danger }]} onPress={() => openDenyModal(member)}>
+                    <Ionicons name="close" size={14} color={colors.danger} />
+                    <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '600' }}>Deny</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-
-              <View style={styles.memberActions}>
-                {/* Active/Inactive badge */}
-                <Pressable
-                  onPress={() => handleToggleActive(item)}
-                  style={[
-                    styles.statusBadge,
-                    item.is_active ? styles.activeBadge : styles.inactiveBadge,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.statusText,
-                      { color: item.is_active ? colors.primary : colors.textMuted },
-                    ]}
-                  >
-                    {item.is_active ? 'Active' : 'Inactive'}
-                  </Text>
-                </Pressable>
-
-                {/* Edit button */}
-                <Pressable
-                  onPress={() => openRenameModal(item)}
-                  style={({ pressed }) => [styles.iconBtn, styles.editBtn, pressed && styles.iconBtnPressed]}
-                >
-                  <Ionicons name="pencil-outline" size={18} color={colors.textMuted} />
-                </Pressable>
-
-                {/* Delete button */}
-                <Pressable
-                  onPress={() => handleDelete(item)}
-                  style={({ pressed }) => [styles.iconBtn, styles.deleteBtn, pressed && styles.iconBtnPressed]}
-                >
-                  <Ionicons name="trash-outline" size={18} color={colors.danger} />
-                </Pressable>
-              </View>
-            </View>
-          </Animated.View>
+            ))}
+          </View>
         )}
+
+        <View style={[styles.sectionHeaderRow, { marginTop: THEME.spacing.lg }]}>
+          <Ionicons name="people-outline" size={18} color={colors.text} />
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Members ({totalCount})</Text>
+        </View>
+      </View>
+    );
+  };
+
+  const renderMemberItem = ({ item: member }: { item: GroupMember }) => {
+    const isCurrentUser = member.user_id === user?.id;
+    const initial = member.name ? member.name.charAt(0).toUpperCase() : '?';
+    const isInactive = !member.is_active;
+
+    return (
+      <View style={[styles.memberCard, { backgroundColor: colors.card, borderColor: colors.border, opacity: isInactive ? 0.7 : 1 }]}>
+        <View style={styles.memberLeft}>
+          <View style={[styles.avatar, { backgroundColor: isInactive ? colors.textDim : colors.primaryDark }]}>
+            <Text style={styles.avatarText}>{initial}</Text>
+          </View>
+          <View style={styles.memberInfo}>
+            <View style={styles.nameRow}>
+              <Text style={[styles.memberName, { color: colors.text, textDecorationLine: isInactive ? 'line-through' : 'none' }]}>
+                {member.name}
+              </Text>
+              {isCurrentUser && (
+                <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.badgeText}>You</Text>
+                </View>
+              )}
+              {member.role === 'admin' && (
+                <View style={[styles.badgeOutline, { borderColor: colors.primary }]}>
+                  <Ionicons name="shield-checkmark-outline" size={10} color={colors.primary} style={{ marginRight: 2 }} />
+                  <Text style={[styles.badgeTextOutline, { color: colors.primary }]}>Admin</Text>
+                </View>
+              )}
+            </View>
+            <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>
+              Joined {member.joined_at ? format(new Date(member.joined_at), 'MMM d, yyyy') : 'Unknown'}
+            </Text>
+          </View>
+        </View>
+        
+        <View style={styles.memberRight}>
+          <View style={[styles.badgeOutline, { borderColor: isInactive ? colors.textDim : colors.primary, marginRight: (isAdmin && !isCurrentUser) || isCurrentUser ? 8 : 0 }]}>
+            <Text style={[styles.badgeTextOutline, { color: isInactive ? colors.textDim : colors.primary }]}>
+              {isInactive ? 'Inactive' : 'Active'}
+            </Text>
+          </View>
+
+          {isCurrentUser && (
+            <View style={{ flexDirection: 'row' }}>
+              <TouchableOpacity 
+                style={[styles.iconBtnOnly, { backgroundColor: colors.background }]} 
+                onPress={() => router.push('/profile')}
+              >
+                <Ionicons name="pencil-outline" size={16} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {isAdmin && !isCurrentUser && (
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              <TouchableOpacity 
+                style={[styles.iconBtnOnly, { backgroundColor: isInactive ? colors.background : colors.primaryLight || '#E0F2FE' }]} 
+                onPress={() => openToggleModal(member)}
+              >
+                <Ionicons name="power-outline" size={16} color={isInactive ? colors.text : colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.iconBtnOnly, { backgroundColor: colors.background }]} 
+                onPress={() => openRemoveModal(member)}
+              >
+                <Ionicons name="trash-outline" size={16} color={colors.danger} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  if (isGroupLoading || (isMembersLoading && !membersData)) {
+    return (
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ color: colors.textMuted, marginTop: THEME.spacing.md }}>Loading group settings...</Text>
+      </View>
+    );
+  }
+
+  if (!currentGroup) {
+    return (
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+        <Ionicons name="people-outline" size={64} color={colors.textDim} />
+        <Text style={[styles.emptyTitle, { color: colors.text }]}>No Group Selected</Text>
+        <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
+          Please select a group from the dashboard or create one.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <FlatList
+        data={regularMembers}
+        keyExtractor={(item) => String(item.user_id)}
+        renderItem={renderMemberItem}
+        ListHeaderComponent={renderHeader}
+        contentContainerStyle={styles.listContainer}
+        refreshControl={<RefreshControl refreshing={isMembersLoading} onRefresh={refetch} />}
+        ListEmptyComponent={
+          <View style={styles.centerContainer}>
+            <Text style={{ color: colors.textMuted }}>No members found in this group.</Text>
+          </View>
+        }
       />
 
-      {/* ────── RENAME MODAL ────── */}
-      <Modal
-        visible={renameModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setRenameModalVisible(false)}
-      >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setRenameModalVisible(false)}
-        >
-          <Pressable style={styles.modalContent} onPress={() => {}}>
-            <Text style={styles.modalTitle}>Rename Member</Text>
-            <Text style={styles.modalSubtitle}>
-              Enter a new name for "{renamingMember?.name}"
-            </Text>
-            <TextInput
-              style={styles.modalInput}
-              value={renameText}
-              onChangeText={setRenameText}
-              autoFocus
-              placeholder="New name..."
-              placeholderTextColor={colors.textDim}
-              onSubmitEditing={handleRename}
-              returnKeyType="done"
-            />
+      <Modal visible={modalConfig.visible} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{modalConfig.title}</Text>
+            <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>{modalConfig.message}</Text>
+            
             <View style={styles.modalActions}>
-              <Pressable
-                onPress={() => setRenameModalVisible(false)}
-                style={[styles.modalBtn, styles.modalCancelBtn]}
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={closeModal}
+                disabled={isSubmitting}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                onPress={handleRename}
-                style={[styles.modalBtn, styles.modalSaveBtn]}
+                <Text style={{ color: colors.textMuted, fontWeight: '600' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.submitBtn, { backgroundColor: modalConfig.isDanger ? colors.danger : colors.primary }]}
+                onPress={confirmAction}
+                disabled={isSubmitting}
               >
-                <Text style={styles.modalSaveText}>Save</Text>
-              </Pressable>
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.submitBtnText}>{modalConfig.confirmText}</Text>
+                )}
+              </TouchableOpacity>
             </View>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-
-  // ─── Header ─────────────────────────────────────────
-  headerSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: THEME.spacing.lg,
-    paddingTop: THEME.spacing.lg,
-    paddingBottom: THEME.spacing.md,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: THEME.spacing.md,
-  },
-  headerIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    color: colors.text,
-    fontSize: 22,
-    fontWeight: '700',
-  },
-  headerSub: {
-    color: colors.textMuted,
-    fontSize: 12,
-    marginTop: 1,
-  },
-  addHeaderBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: THEME.spacing.xs,
-    backgroundColor: colors.primary,
-    paddingHorizontal: THEME.spacing.lg,
-    paddingVertical: THEME.spacing.sm,
-    borderRadius: THEME.radius.full,
-  },
-  addHeaderText: {
-    color: '#FFF',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-
-  // ─── Stats ──────────────────────────────────────────
-  statsRow: {
-    flexDirection: 'row',
-    gap: THEME.spacing.sm,
-    paddingHorizontal: THEME.spacing.lg,
-    paddingBottom: THEME.spacing.lg,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderRadius: THEME.radius.lg,
-    padding: THEME.spacing.sm,
-    alignItems: 'center',
-    borderWidth: 1,
-    gap: 2,
-  },
-  statIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 2,
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  statLabel: {
-    color: colors.textMuted,
-    fontSize: 10,
-    fontWeight: '500',
-    textAlign: 'center',
-    lineHeight: 13,
-  },
-
-  // ─── Add ────────────────────────────────────────────
-  addRow: {
-    flexDirection: 'row',
-    paddingHorizontal: THEME.spacing.lg,
-    marginBottom: THEME.spacing.lg,
-    gap: THEME.spacing.sm,
-  },
-  inputWrapper: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderRadius: THEME.radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: THEME.spacing.md,
-  },
-  inputIcon: {
-    marginRight: THEME.spacing.sm,
-  },
-  input: {
-    flex: 1,
-    paddingVertical: THEME.spacing.md,
-    color: colors.text,
-    fontSize: 15,
-  },
-  addBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: THEME.radius.lg,
-    width: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // ─── List Header ───────────────────────────────────
-  listHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: THEME.spacing.lg,
-    marginBottom: THEME.spacing.md,
-  },
-  listHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: THEME.spacing.sm,
-  },
-  listHeaderText: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  listContent: {
-    paddingHorizontal: THEME.spacing.lg,
-    paddingBottom: THEME.spacing.xxxl + 20,
-  },
-
-  // ─── Member Card ────────────────────────────────────
-  memberCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.card,
-    borderRadius: THEME.radius.lg,
-    padding: THEME.spacing.lg,
-    marginBottom: THEME.spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  memberCardInactive: {
-    opacity: 0.6,
-    borderColor: colors.border,
-  },
-  memberLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: THEME.spacing.md,
-    flex: 1,
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInactive: {
-    backgroundColor: colors.textDim,
-  },
-  avatarText: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  memberInfo: {
-    flex: 1,
-  },
-  memberName: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  memberNameInactive: {
-    textDecorationLine: 'line-through',
-    color: colors.textMuted,
-  },
-  memberMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 3,
-  },
-  memberMeta: {
-    color: colors.textDim,
-    fontSize: 11,
-  },
-
-  // ─── Actions ────────────────────────────────────────
-  memberActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: THEME.spacing.sm,
-  },
-  statusBadge: {
-    paddingHorizontal: THEME.spacing.md,
-    paddingVertical: THEME.spacing.xs,
-    borderRadius: THEME.radius.full,
-  },
-  activeBadge: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-  },
-  inactiveBadge: {
-    backgroundColor: 'rgba(100, 116, 139, 0.15)',
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  editBtn: {
-    backgroundColor: 'rgba(148, 163, 184, 0.1)',
-    borderColor: colors.border,
-  },
-  deleteBtn: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderColor: 'rgba(239, 68, 68, 0.3)',
-  },
-  iconBtnPressed: {
-    opacity: 0.6,
-  },
-
-  // ─── Empty State ────────────────────────────────────
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 80,
-    gap: THEME.spacing.md,
-  },
-  emptyTitle: {
-    color: colors.text,
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  emptySubtitle: {
-    color: colors.textMuted,
-    fontSize: 14,
-    textAlign: 'center',
-  },
-
-  // ─── Rename Modal ──────────────────────────────────
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: THEME.spacing.xxl,
-  },
-  modalContent: {
-    backgroundColor: colors.card,
-    borderRadius: THEME.radius.xl,
-    padding: THEME.spacing.xxl,
-    width: '100%',
-    maxWidth: 400,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  modalTitle: {
-    color: colors.text,
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: THEME.spacing.xs,
-  },
-  modalSubtitle: {
-    color: colors.textMuted,
-    fontSize: 13,
-    marginBottom: THEME.spacing.lg,
-  },
-  modalInput: {
-    backgroundColor: colors.background,
-    borderRadius: THEME.radius.md,
-    padding: THEME.spacing.lg,
-    color: colors.text,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: THEME.spacing.xl,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: THEME.spacing.md,
-  },
-  modalBtn: {
-    flex: 1,
-    paddingVertical: THEME.spacing.md,
-    borderRadius: THEME.radius.md,
-    alignItems: 'center',
-  },
-  modalCancelBtn: {
-    backgroundColor: 'rgba(100, 116, 139, 0.15)',
-  },
-  modalCancelText: {
-    color: colors.textMuted,
-    fontWeight: '600',
-    fontSize: 15,
-  },
-  modalSaveBtn: {
-    backgroundColor: colors.primary,
-  },
-  modalSaveText: {
-    color: '#FFF',
-    fontWeight: '700',
-    fontSize: 15,
-  },
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: THEME.spacing.xl },
+  listContainer: { padding: THEME.spacing.md, gap: THEME.spacing.sm, paddingBottom: THEME.spacing.xxl },
+  card: { padding: THEME.spacing.lg, borderRadius: THEME.radius.xl, borderWidth: 1 },
+  groupInfoRow: { flexDirection: 'row', alignItems: 'center', gap: THEME.spacing.md },
+  groupLogo: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  groupName: { fontSize: 18, fontWeight: '700' },
+  divider: { height: 1, marginVertical: THEME.spacing.md },
+  sectionTitle: { fontSize: 16, fontWeight: '700' },
+  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: THEME.spacing.sm },
+  inviteRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  inviteCode: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, fontSize: 16, fontWeight: '700', letterSpacing: 2, flex: 1, marginRight: THEME.spacing.sm, textAlign: 'center' },
+  iconBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1, gap: 4 },
+  statsRow: { flexDirection: 'row', gap: THEME.spacing.sm, marginTop: THEME.spacing.md },
+  statCard: { flex: 1, padding: THEME.spacing.md, borderRadius: THEME.radius.lg, borderWidth: 1, alignItems: 'center' },
+  statValue: { fontSize: 22, fontWeight: '700' },
+  statLabel: { fontSize: 12, fontWeight: '600', marginTop: 4 },
+  memberCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: THEME.spacing.md, borderRadius: THEME.radius.lg, borderWidth: 1, marginBottom: THEME.spacing.sm },
+  memberLeft: { flexDirection: 'row', alignItems: 'center', gap: THEME.spacing.md, flex: 1 },
+  avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#FFFFFF', fontWeight: '700', fontSize: 16 },
+  memberInfo: { flex: 1 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  memberName: { fontSize: 15, fontWeight: '600' },
+  badge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 12 },
+  badgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
+  badgeOutline: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 12, borderWidth: 1 },
+  badgeTextOutline: { fontSize: 10, fontWeight: '700' },
+  memberRight: { flexDirection: 'row', alignItems: 'center' },
+  iconBtnOnly: { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  smallBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, gap: 4 },
+  smallBtnOutline: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, gap: 4 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: THEME.spacing.lg },
+  modalCard: { padding: THEME.spacing.xl, borderRadius: THEME.radius.xl, borderWidth: 1, gap: THEME.spacing.md },
+  modalTitle: { fontSize: 18, fontWeight: '700' },
+  modalSubtitle: { fontSize: 14, lineHeight: 20 },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: THEME.spacing.md, marginTop: THEME.spacing.sm },
+  cancelBtn: { paddingVertical: 10, paddingHorizontal: 16 },
+  submitBtn: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: THEME.radius.md, justifyContent: 'center', alignItems: 'center' },
+  submitBtnText: { color: '#FFFFFF', fontWeight: '600' },
+  emptyTitle: { fontSize: 18, fontWeight: '700', marginTop: THEME.spacing.md },
+  emptySubtitle: { fontSize: 14, textAlign: 'center', marginTop: THEME.spacing.sm, paddingHorizontal: THEME.spacing.xl },
 });

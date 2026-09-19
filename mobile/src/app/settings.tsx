@@ -1,517 +1,467 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React from 'react';
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
   ScrollView,
-  Pressable,
+  TouchableOpacity,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Modal
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { THEME, useAppTheme, useThemeMode, type ThemeColors, type ThemeMode } from '@/utils/theme';
-import { getCurrentPrices, updatePrices, type CurrentPrices } from '@/db/prices.repo';
-import { getMonthsWithData } from '@/db/summary.repo';
-import { format, parseISO } from 'date-fns';
-import { exportToExcel } from '@/utils/exportExcel';
-import { exportToPdf } from '@/utils/exportPdf';
+import { format } from 'date-fns';
+import { THEME, useAppTheme, useThemeMode, ThemeMode } from '@/utils/theme';
+import { useAuth } from '@/context/AuthContext';
+import { useGroup } from '@/context/GroupContext';
+import { usePricesQuery } from '@/hooks/usePricesQuery';
+import { useSavePrices } from '@/hooks/useSavePrices';
+import { getPrevMonth, getNextMonth, formatMonth } from '@/utils/dateHelpers';
 
 export default function SettingsScreen() {
   const colors = useAppTheme();
   const { mode, setMode } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { user, logout } = useAuth();
+  const { groups, currentGroup, switchGroup, isAdmin } = useGroup();
 
-  const [prices, setPrices] = useState<CurrentPrices>({ morning: 0, afternoon: 0, night: 0 });
-  const [morningInput, setMorningInput] = useState('');
-  const [afternoonInput, setAfternoonInput] = useState('');
-  const [nightInput, setNightInput] = useState('');
-  const [saving, setSaving] = useState(false);
+  const { data: pricesData } = usePricesQuery(currentGroup?.id);
+  const savePricesMutation = useSavePrices(currentGroup?.id);
 
-  const [months, setMonths] = useState<{month: string}[]>([]);
-  const [selectedMonth, setSelectedMonth] = useState<string>('');
-  const [isMonthPickerVisible, setMonthPickerVisible] = useState(false);
-  const [exporting, setExporting] = useState(false);
-
-  const loadPrices = useCallback(async () => {
-    const p = await getCurrentPrices();
-    setPrices(p);
-    setMorningInput(String(p.morning));
-    setAfternoonInput(String(p.afternoon));
-    setNightInput(String(p.night));
-  }, []);
-
-  const loadMonths = useCallback(async () => {
-    const data = await getMonthsWithData();
-    if (data && data.length > 0) {
-      setMonths(data);
-      if (!selectedMonth) {
-        setSelectedMonth(data[0].month);
+  const latestPrices = React.useMemo(() => {
+    const latest = { morning: '0', afternoon: '0', night: '0' };
+    if (!pricesData) return latest;
+    for (const p of pricesData) {
+      if (latest[p.meal_type] === '0' || latest[p.meal_type] === '') {
+        latest[p.meal_type] = String(p.price);
       }
-    } else {
-      const current = format(new Date(), 'yyyy-MM');
-      setMonths([{ month: current }]);
-      setSelectedMonth(current);
     }
-  }, [selectedMonth]);
+    return latest;
+  }, [pricesData]);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadPrices();
-      loadMonths();
-    }, [loadPrices, loadMonths])
-  );
+  const [morningInput, setMorningInput] = React.useState<string | null>(null);
+  const [afternoonInput, setAfternoonInput] = React.useState<string | null>(null);
+  const [nightInput, setNightInput] = React.useState<string | null>(null);
+  const [isEditingPrices, setIsEditingPrices] = React.useState(false);
 
-  const handleSavePrices = async () => {
-    const m = parseFloat(morningInput);
-    const a = parseFloat(afternoonInput);
-    const n = parseFloat(nightInput);
+  const morningValue = morningInput !== null ? morningInput : latestPrices.morning;
+  const afternoonValue = afternoonInput !== null ? afternoonInput : latestPrices.afternoon;
+  const nightValue = nightInput !== null ? nightInput : latestPrices.night;
 
-    if (isNaN(m) || isNaN(a) || isNaN(n) || m < 0 || a < 0 || n < 0) {
-      Alert.alert('Invalid Prices', 'Please enter valid positive numbers.');
-      return;
-    }
+  const [exportMonth, setExportMonth] = React.useState(format(new Date(), 'yyyy-MM'));
+  const [isExportingPdf, setIsExportingPdf] = React.useState(false);
+  const [isExportingExcel, setIsExportingExcel] = React.useState(false);
 
-    setSaving(true);
+  const handleExportPdf = async () => {
+    if (!currentGroup) return;
+    setIsExportingPdf(true);
     try {
-      await updatePrices(m, a, n);
-      Alert.alert('Saved', 'Meal prices updated from today onwards.');
-      await loadPrices();
-    } catch (e) {
-      Alert.alert('Error', 'Failed to save prices.');
+      const { exportToPdf } = await import('@/utils/exportPdf');
+      await exportToPdf(currentGroup.id, exportMonth, { morning: Number(morningValue), afternoon: Number(afternoonValue), night: Number(nightValue) });
+    } catch (error) {
+      Alert.alert('Export Failed', 'There was an error exporting the PDF.');
     } finally {
-      setSaving(false);
+      setIsExportingPdf(false);
     }
   };
 
   const handleExportExcel = async () => {
-    if (!selectedMonth) return;
-    setExporting(true);
+    if (!currentGroup) return;
+    setIsExportingExcel(true);
     try {
-      await exportToExcel(selectedMonth);
-    } catch (e: any) {
-      Alert.alert('Export Failed', e.message || 'Unknown error');
+      const { exportToExcel } = await import('@/utils/exportExcel');
+      await exportToExcel(currentGroup.id, exportMonth, { morning: Number(morningValue), afternoon: Number(afternoonValue), night: Number(nightValue) });
+    } catch (error) {
+      Alert.alert('Export Failed', 'There was an error exporting the Excel file.');
     } finally {
-      setExporting(false);
+      setIsExportingExcel(false);
     }
   };
 
-  const handleExportPdf = async () => {
-    if (!selectedMonth) return;
-    setExporting(true);
-    try {
-      await exportToPdf(selectedMonth);
-    } catch (e: any) {
-      Alert.alert('Export Failed', e.message || 'Unknown error');
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const renderThemeOption = (themeMode: ThemeMode, icon: keyof typeof Ionicons.glyphMap, label: string) => {
-    const isActive = mode === themeMode;
-    return (
-      <Pressable
-        style={[styles.themeOption, isActive && styles.themeOptionActive]}
-        onPress={() => setMode(themeMode)}
-      >
-        <Ionicons
-          name={icon}
-          size={20}
-          color={isActive ? '#FFFFFF' : colors.textDim}
-        />
-        <Text style={[styles.themeOptionText, isActive && styles.themeOptionTextActive]}>
-          {label}
-        </Text>
-      </Pressable>
+  const handleSavePrices = () => {
+    if (!currentGroup) return;
+    const today = format(new Date(), 'yyyy-MM-dd');
+    
+    savePricesMutation.mutate(
+      {
+        morningPrice: Number(morningValue),
+        afternoonPrice: Number(afternoonValue),
+        nightPrice: Number(nightValue),
+        effectiveFrom: today,
+      },
+      {
+        onSuccess: () => {
+          setMorningInput(null);
+          setAfternoonInput(null);
+          setNightInput(null);
+          setIsEditingPrices(false);
+          Alert.alert('Success', 'Meal prices updated successfully.');
+        },
+        onError: (err) => {
+          Alert.alert('Error', 'Failed to save prices. Please try again.');
+        },
+      }
     );
   };
 
-  const getMonthDisplay = (m: string) => {
-    if (!m) return 'Select Month';
-    return format(parseISO(`${m}-01`), 'MMMM yyyy');
+  const handleLogoutPress = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to log out of MealMate?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: async () => {
+            await logout();
+          },
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
-  return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Appearance Settings */}
-        <Animated.View entering={FadeIn.duration(300)}>
-          <Text style={styles.sectionTitle}>Appearance</Text>
-          <Text style={styles.sectionSubtitle}>Choose your UI theme preference.</Text>
-        </Animated.View>
-        
-        <Animated.View entering={FadeInDown.delay(50)} style={styles.themeSelector}>
-          {renderThemeOption('light', 'sunny-outline', 'Light')}
-          {renderThemeOption('dark', 'moon-outline', 'Dark')}
-          {renderThemeOption('system', 'phone-portrait-outline', 'System')}
-        </Animated.View>
+  const initial = user?.full_name ? user.full_name.charAt(0).toUpperCase() : '?';
 
-        {/* Current Prices */}
-        <Animated.View entering={FadeInDown.delay(100)}>
-          <Text style={[styles.sectionTitle, { marginTop: THEME.spacing.xl }]}>Meal Prices</Text>
-          <Text style={styles.sectionSubtitle}>
+  return (
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={styles.contentContainer}
+    >
+      <Text style={[styles.title, { color: colors.text }]}>Settings & Account</Text>
+
+      {/* Account Profile Card */}
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ACCOUNT</Text>
+        <View style={styles.accountRow}>
+          <View style={[styles.avatar, { backgroundColor: colors.primaryDark }]}>
+            <Text style={styles.avatarText}>{initial}</Text>
+          </View>
+          <View style={styles.accountDetails}>
+            <Text style={[styles.userName, { color: colors.text }]}>{user?.full_name || 'User'}</Text>
+            <Text style={[styles.userEmail, { color: colors.textMuted }]}>{user?.email || 'N/A'}</Text>
+            {user?.id && (
+              <Text style={[styles.userId, { color: colors.primary }]}>User ID: #{user.id}</Text>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* Active Group Card */}
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ACTIVE GROUP</Text>
+        {currentGroup ? (
+          <View style={styles.groupInfo}>
+            <View style={styles.groupHeaderRow}>
+              <Text style={[styles.groupName, { color: colors.text }]}>{currentGroup.name}</Text>
+              {currentGroup.role && (
+                <View style={[styles.roleBadge, { borderColor: colors.primary }]}>
+                  <Text style={[styles.roleBadgeText, { color: colors.primary }]}>
+                    {currentGroup.role.toUpperCase()}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {currentGroup.invite_code && (
+              <View style={styles.infoRow}>
+                <Ionicons name="key-outline" size={16} color={colors.textDim} />
+                <Text style={[styles.infoText, { color: colors.textMuted }]}>
+                  Invite Code: <Text style={{ color: colors.text, fontWeight: '700' }}>{currentGroup.invite_code}</Text>
+                </Text>
+              </View>
+            )}
+
+            {/* Group Switcher if user is in multiple groups */}
+            {groups.length > 1 && (
+              <View style={styles.groupSwitcherBox}>
+                <Text style={[styles.switcherLabel, { color: colors.textDim }]}>Switch Group:</Text>
+                <View style={styles.groupChips}>
+                  {groups.map((g) => (
+                    <TouchableOpacity
+                      key={g.id}
+                      onPress={() => switchGroup(g.id)}
+                      style={[
+                        styles.chip,
+                        {
+                          backgroundColor: g.id === currentGroup.id ? colors.primary : colors.background,
+                          borderColor: colors.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.chipText,
+                          { color: g.id === currentGroup.id ? '#FFFFFF' : colors.textMuted },
+                        ]}
+                      >
+                        {g.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+          </View>
+        ) : (
+          <Text style={{ color: colors.textMuted }}>No active group selected.</Text>
+        )}
+      </View>
+
+      {/* Theme Preferences */}
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>APPEARANCE</Text>
+        <View style={styles.themeRow}>
+          {(['system', 'light', 'dark'] as ThemeMode[]).map((m) => (
+            <TouchableOpacity
+              key={m}
+              onPress={() => setMode(m)}
+              style={[
+                styles.themeOption,
+                {
+                  backgroundColor: mode === m ? colors.primary : colors.background,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Ionicons
+                name={
+                  m === 'system'
+                    ? 'desktop-outline'
+                    : m === 'light'
+                    ? 'sunny-outline'
+                    : 'moon-outline'
+                }
+                size={18}
+                color={mode === m ? '#FFFFFF' : colors.textMuted}
+              />
+              <Text
+                style={[
+                  styles.themeText,
+                  { color: mode === m ? '#FFFFFF' : colors.textMuted },
+                ]}
+              >
+                {m.charAt(0).toUpperCase() + m.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* Meal Prices (Admin only) */}
+      {isAdmin && (
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>MEAL PRICES</Text>
+            <TouchableOpacity onPress={() => setIsEditingPrices(!isEditingPrices)}>
+              <Ionicons 
+                name={isEditingPrices ? "close-outline" : "pencil-outline"} 
+                size={20} 
+                color={isEditingPrices ? colors.danger : colors.primary} 
+              />
+            </TouchableOpacity>
+          </View>
+          <Text style={[styles.infoText, { color: colors.textMuted, marginBottom: THEME.spacing.sm }]}>
             Changes take effect from today onwards. Past calculations stay unchanged.
           </Text>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(150)} style={styles.priceCard}>
-          {/* Morning */}
+          
           <View style={styles.priceRow}>
-            <View style={[styles.priceLabel, { backgroundColor: colors.morningBg }]}>
-              <Text style={{ color: colors.morning, fontWeight: '600' }}>☀️ Morning</Text>
+            <Text style={[styles.priceLabel, { color: colors.morning || '#F59E0B' }]}>☀️ Morning</Text>
+            <View style={[styles.inputWrapper, { backgroundColor: isEditingPrices ? colors.background : colors.card, borderColor: colors.border, opacity: isEditingPrices ? 1 : 0.6 }]}>
+              <Text style={{ color: colors.textDim, paddingLeft: 12 }}>₹</Text>
+              <TextInput
+                style={[styles.priceInput, { color: colors.text }]}
+                keyboardType="numeric"
+                value={morningValue}
+                onChangeText={setMorningInput}
+                editable={isEditingPrices}
+              />
             </View>
-            <TextInput
-              style={styles.priceInput}
-              value={morningInput}
-              onChangeText={setMorningInput}
-              keyboardType="numeric"
-              placeholder="0"
-              placeholderTextColor={colors.textDim}
-            />
+          </View>
+          <View style={styles.priceRow}>
+            <Text style={[styles.priceLabel, { color: colors.afternoon || '#F97316' }]}>🌤️ Afternoon</Text>
+            <View style={[styles.inputWrapper, { backgroundColor: isEditingPrices ? colors.background : colors.card, borderColor: colors.border, opacity: isEditingPrices ? 1 : 0.6 }]}>
+              <Text style={{ color: colors.textDim, paddingLeft: 12 }}>₹</Text>
+              <TextInput
+                style={[styles.priceInput, { color: colors.text }]}
+                keyboardType="numeric"
+                value={afternoonValue}
+                onChangeText={setAfternoonInput}
+                editable={isEditingPrices}
+              />
+            </View>
+          </View>
+          <View style={styles.priceRow}>
+            <Text style={[styles.priceLabel, { color: colors.night || '#6366F1' }]}>🌙 Night</Text>
+            <View style={[styles.inputWrapper, { backgroundColor: isEditingPrices ? colors.background : colors.card, borderColor: colors.border, opacity: isEditingPrices ? 1 : 0.6 }]}>
+              <Text style={{ color: colors.textDim, paddingLeft: 12 }}>₹</Text>
+              <TextInput
+                style={[styles.priceInput, { color: colors.text }]}
+                keyboardType="numeric"
+                value={nightValue}
+                onChangeText={setNightInput}
+                editable={isEditingPrices}
+              />
+            </View>
           </View>
 
-          {/* Afternoon */}
-          <View style={styles.priceRow}>
-            <View style={[styles.priceLabel, { backgroundColor: colors.afternoonBg }]}>
-              <Text style={{ color: colors.afternoon, fontWeight: '600' }}>🌤️ Afternoon</Text>
-            </View>
-            <TextInput
-              style={styles.priceInput}
-              value={afternoonInput}
-              onChangeText={setAfternoonInput}
-              keyboardType="numeric"
-              placeholder="0"
-              placeholderTextColor={colors.textDim}
-            />
-          </View>
-
-          {/* Night */}
-          <View style={styles.priceRow}>
-            <View style={[styles.priceLabel, { backgroundColor: colors.nightBg }]}>
-              <Text style={{ color: colors.night, fontWeight: '600' }}>🌙 Night</Text>
-            </View>
-            <TextInput
-              style={styles.priceInput}
-              value={nightInput}
-              onChangeText={setNightInput}
-              keyboardType="numeric"
-              placeholder="0"
-              placeholderTextColor={colors.textDim}
-            />
-          </View>
-
-          <Pressable
-            onPress={handleSavePrices}
-            style={[styles.saveBtn, saving && { opacity: 0.6 }]}
-            disabled={saving}
-          >
-            <Ionicons name="checkmark-circle" size={20} color="#FFF" />
-            <Text style={styles.saveBtnText}>
-              {saving ? 'Saving...' : 'Save Prices'}
-            </Text>
-          </Pressable>
-        </Animated.View>
-
-        {/* Reports & Export */}
-        <Animated.View entering={FadeInDown.delay(200)}>
-          <Text style={[styles.sectionTitle, { marginTop: THEME.spacing.xxl }]}>
-            Reports
-          </Text>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(300)}>
-          <View style={styles.reportsCard}>
-            <Text style={styles.label}>Select Month</Text>
-            <Pressable 
-              style={styles.monthPickerBtn} 
-              onPress={() => setMonthPickerVisible(true)}
+          {isEditingPrices && (
+            <TouchableOpacity
+              style={[styles.saveBtn, { backgroundColor: colors.primary }]}
+              onPress={handleSavePrices}
+              disabled={savePricesMutation.isPending}
             >
-              <Text style={styles.monthPickerText}>{getMonthDisplay(selectedMonth)}</Text>
-              <Ionicons name="chevron-down" size={20} color={colors.textDim} />
-            </Pressable>
+              {savePricesMutation.isPending ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle-outline" size={18} color="#FFF" />
+                  <Text style={styles.saveBtnText}>Save Prices</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
-            <View style={styles.exportRow}>
-              <Pressable 
-                style={[styles.exportBtn, { backgroundColor: '#107c41' }, exporting && { opacity: 0.6 }]} 
-                onPress={handleExportExcel}
-                disabled={exporting}
-              >
-                <Ionicons name="document-text-outline" size={20} color="#FFF" />
-                <Text style={styles.exportBtnText}>Export Excel (.xlsx)</Text>
-              </Pressable>
+      {/* Export Reports */}
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>EXPORT REPORTS</Text>
+        
+        <View style={styles.exportMonthNav}>
+          <TouchableOpacity onPress={() => setExportMonth(getPrevMonth(exportMonth))} style={styles.exportNavBtn}>
+            <Ionicons name="chevron-back" size={20} color={colors.primary} />
+          </TouchableOpacity>
+          <Text style={[styles.exportMonthText, { color: colors.text }]}>{formatMonth(exportMonth)}</Text>
+          <TouchableOpacity onPress={() => setExportMonth(getNextMonth(exportMonth))} style={styles.exportNavBtn}>
+            <Ionicons name="chevron-forward" size={20} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
 
-              <Pressable 
-                style={[styles.exportBtn, { backgroundColor: '#d32f2f' }, exporting && { opacity: 0.6 }]} 
-                onPress={handleExportPdf}
-                disabled={exporting}
-              >
-                <Ionicons name="document-outline" size={20} color="#FFF" />
-                <Text style={styles.exportBtnText}>Export PDF (.pdf)</Text>
-              </Pressable>
-            </View>
-          </View>
-        </Animated.View>
+        <View style={styles.exportActions}>
+          <TouchableOpacity
+            style={[styles.exportBtn, { backgroundColor: colors.background, borderColor: colors.border }]}
+            onPress={handleExportPdf}
+            disabled={isExportingPdf || isExportingExcel}
+          >
+            {isExportingPdf ? (
+              <ActivityIndicator size="small" color={colors.danger} />
+            ) : (
+              <>
+                <Ionicons name="document-text" size={24} color={colors.danger} />
+                <Text style={[styles.exportBtnText, { color: colors.text }]}>Export PDF</Text>
+              </>
+            )}
+          </TouchableOpacity>
 
-        {/* App Info */}
-        <Animated.View entering={FadeInDown.delay(400)} style={styles.infoCard}>
-          <Text style={styles.infoTitle}>MealMate</Text>
-          <Text style={styles.infoVersion}>v1.0.0 — 100% Offline</Text>
-          <Text style={styles.infoDesc}>
-            All data is stored locally on your device. No internet required.
-          </Text>
-        </Animated.View>
-      </ScrollView>
+          <TouchableOpacity
+            style={[styles.exportBtn, { backgroundColor: colors.background, borderColor: colors.border }]}
+            onPress={handleExportExcel}
+            disabled={isExportingPdf || isExportingExcel}
+          >
+            {isExportingExcel ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <>
+                <Ionicons name="stats-chart" size={24} color={colors.primary} />
+                <Text style={[styles.exportBtnText, { color: colors.text }]}>Export Excel</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
 
-      {/* Custom Month Picker Modal */}
-      <Modal
-        visible={isMonthPickerVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setMonthPickerVisible(false)}
+      {/* Logout Action */}
+      <TouchableOpacity
+        style={[styles.logoutBtn, { backgroundColor: colors.dangerLight + '20', borderColor: colors.danger }]}
+        onPress={handleLogoutPress}
       >
-        <Pressable 
-          style={styles.modalOverlay}
-          onPress={() => setMonthPickerVisible(false)}
-        >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Month</Text>
-            <ScrollView style={{ maxHeight: 300 }}>
-              {months.map((m) => (
-                <Pressable
-                  key={m.month}
-                  style={[
-                    styles.modalOption,
-                    selectedMonth === m.month && { backgroundColor: colors.primary + '15' }
-                  ]}
-                  onPress={() => {
-                    setSelectedMonth(m.month);
-                    setMonthPickerVisible(false);
-                  }}
-                >
-                  <Text style={[
-                    styles.modalOptionText,
-                    selectedMonth === m.month && { color: colors.primary, fontWeight: '700' }
-                  ]}>
-                    {getMonthDisplay(m.month)}
-                  </Text>
-                  {selectedMonth === m.month && (
-                    <Ionicons name="checkmark" size={20} color={colors.primary} />
-                  )}
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-        </Pressable>
-      </Modal>
-    </KeyboardAvoidingView>
+        <Ionicons name="log-out-outline" size={20} color={colors.danger} />
+        <Text style={[styles.logoutBtnText, { color: colors.danger }]}>Log Out</Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  contentContainer: { padding: THEME.spacing.lg, gap: THEME.spacing.lg },
+  title: { fontSize: 22, fontWeight: '700', marginBottom: 4 },
+  card: {
     padding: THEME.spacing.lg,
-    paddingBottom: THEME.spacing.xxxl,
-  },
-  sectionTitle: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: THEME.spacing.xs,
-  },
-  sectionSubtitle: {
-    color: colors.textMuted,
-    fontSize: 13,
-    marginBottom: THEME.spacing.lg,
-  },
-  themeSelector: {
-    flexDirection: 'row',
-    backgroundColor: colors.card,
     borderRadius: THEME.radius.lg,
-    padding: 4,
     borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: THEME.spacing.md,
+    gap: THEME.spacing.md,
   },
+  sectionLabel: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
+  accountRow: { flexDirection: 'row', alignItems: 'center', gap: THEME.spacing.md },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: { color: '#FFFFFF', fontWeight: '700', fontSize: 20 },
+  accountDetails: { flex: 1, gap: 2 },
+  userName: { fontSize: 18, fontWeight: '700' },
+  userEmail: { fontSize: 13 },
+  userId: { fontSize: 12, fontWeight: '600', marginTop: 2 },
+  groupInfo: { gap: THEME.spacing.sm },
+  groupHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  groupName: { fontSize: 18, fontWeight: '700' },
+  roleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: THEME.radius.full,
+    borderWidth: 1,
+  },
+  roleBadgeText: { fontSize: 10, fontWeight: '700' },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  infoText: { fontSize: 13 },
+  groupSwitcherBox: { marginTop: THEME.spacing.sm, gap: 6 },
+  switcherLabel: { fontSize: 12, fontWeight: '600' },
+  groupChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: THEME.radius.full,
+    borderWidth: 1,
+  },
+  chipText: { fontSize: 12, fontWeight: '600' },
+  priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  priceLabel: { fontSize: 14, fontWeight: '600', width: 100 },
+  inputWrapper: { flexDirection: 'row', alignItems: 'center', flex: 1, borderWidth: 1, borderRadius: THEME.radius.md, height: 40 },
+  priceInput: { flex: 1, height: 40, paddingHorizontal: 8, fontSize: 16 },
+  saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: THEME.radius.md, gap: 8, marginTop: THEME.spacing.sm },
+  saveBtnText: { color: '#FFF', fontSize: 14, fontWeight: '700' },
+  themeRow: { flexDirection: 'row', gap: THEME.spacing.sm },
   themeOption: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: THEME.spacing.md,
+    paddingVertical: 10,
     borderRadius: THEME.radius.md,
+    borderWidth: 1,
     gap: 6,
   },
-  themeOptionActive: {
-    backgroundColor: colors.primary,
-  },
-  themeOptionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textDim,
-  },
-  themeOptionTextActive: {
-    color: '#FFFFFF',
-  },
-  priceCard: {
-    backgroundColor: colors.card,
-    borderRadius: THEME.radius.xl,
-    padding: THEME.spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: THEME.spacing.md,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: THEME.spacing.md,
-  },
-  priceLabel: {
-    flex: 1,
-    paddingVertical: THEME.spacing.md,
-    paddingHorizontal: THEME.spacing.md,
-    borderRadius: THEME.radius.md,
-  },
-  priceInput: {
-    width: 90,
-    backgroundColor: colors.background,
-    borderRadius: THEME.radius.md,
-    paddingHorizontal: THEME.spacing.md,
-    paddingVertical: THEME.spacing.md,
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  saveBtn: {
+  themeText: { fontSize: 13, fontWeight: '600' },
+  logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: THEME.spacing.sm,
-    backgroundColor: colors.primary,
+    paddingVertical: 14,
     borderRadius: THEME.radius.lg,
-    paddingVertical: THEME.spacing.md,
-    marginTop: THEME.spacing.sm,
-  },
-  saveBtnText: {
-    color: '#FFF',
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  reportsCard: {
-    backgroundColor: colors.card,
-    borderRadius: THEME.radius.xl,
-    padding: THEME.spacing.lg,
     borderWidth: 1,
-    borderColor: colors.border,
-    gap: THEME.spacing.md,
+    gap: 8,
+    marginTop: THEME.spacing.md,
   },
-  label: {
-    color: colors.textDim,
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  monthPickerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: THEME.radius.md,
-    padding: THEME.spacing.md,
-  },
-  monthPickerText: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  exportRow: {
-    flexDirection: 'column',
-    gap: THEME.spacing.sm,
-    marginTop: THEME.spacing.sm,
-  },
-  exportBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: THEME.spacing.sm,
-    borderRadius: THEME.radius.lg,
-    paddingVertical: THEME.spacing.md,
-  },
-  exportBtnText: {
-    color: '#FFF',
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  infoCard: {
-    alignItems: 'center',
-    padding: THEME.spacing.xxl,
-    marginTop: THEME.spacing.xxxl,
-  },
-  infoTitle: {
-    color: colors.primary,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  infoVersion: {
-    color: colors.textMuted,
-    fontSize: 12,
-    marginTop: 4,
-  },
-  infoDesc: {
-    color: colors.textDim,
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: THEME.spacing.sm,
-    maxWidth: 250,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    width: '100%',
-    backgroundColor: colors.card,
-    borderRadius: THEME.radius.xl,
-    padding: THEME.spacing.lg,
-  },
-  modalTitle: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: THEME.spacing.md,
-    textAlign: 'center',
-  },
-  modalOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: THEME.spacing.md,
-    paddingHorizontal: THEME.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  modalOptionText: {
-    color: colors.text,
-    fontSize: 16,
-  }
+  logoutBtnText: { fontSize: 15, fontWeight: '700' },
+  exportMonthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: THEME.spacing.sm, gap: THEME.spacing.xl },
+  exportNavBtn: { padding: THEME.spacing.sm },
+  exportMonthText: { fontSize: 16, fontWeight: '700', minWidth: 140, textAlign: 'center' },
+  exportActions: { flexDirection: 'row', gap: THEME.spacing.md, marginTop: THEME.spacing.xs },
+  exportBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: THEME.radius.md, borderWidth: 1 },
+  exportBtnText: { fontSize: 14, fontWeight: '600' },
 });

@@ -1,31 +1,30 @@
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
-import { getMonthlySummary, MonthSummary } from '@/db/summary.repo';
-import { getMemberMonthlyDetails, MemberMonthlyDetailsData } from '@/db/memberMonthlyDetails.service';
-import { format, parseISO } from 'date-fns';
+import { getMonthlySummary } from '@/api/summary';
+import { getAttendance } from '@/api/attendance';
+import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { Platform } from 'react-native';
 import { Asset } from 'expo-asset';
-import * as FileSystem from 'expo-file-system/legacy';
 
-export async function exportToPdf(monthStr: string) {
+export async function exportToPdf(
+  groupId: number, 
+  monthStr: string, 
+  currentPrices: { morning: number; afternoon: number; night: number }
+) {
   try {
-    const summary = await getMonthlySummary(monthStr);
+    const summary = await getMonthlySummary(groupId, monthStr);
+    const allAttendance = await getAttendance(groupId, undefined, monthStr);
     const monthFormatted = format(parseISO(`${monthStr}-01`), 'MMMM yyyy');
 
-    let prices = { morning: 0, afternoon: 0, night: 0 };
-    if (summary.members.length > 0) {
-       const firstMemberDetails = await getMemberMonthlyDetails(summary.members[0].memberId, monthStr);
-       if (firstMemberDetails) prices = firstMemberDetails.prices;
-    }
+    const prices = currentPrices;
 
     let logoHtml = '';
     try {
       const asset = Asset.fromModule(require('../../assets/images/favicon.png'));
       await asset.downloadAsync();
-      
+
       let logoSrc = asset.uri;
       if (Platform.OS !== 'web') {
         if (asset.localUri) {
+          const FileSystem = require('expo-file-system/legacy');
           const base64Logo = await FileSystem.readAsStringAsync(asset.localUri, {
             encoding: FileSystem.EncodingType.Base64,
           });
@@ -173,14 +172,14 @@ export async function exportToPdf(monthStr: string) {
         </tr>
     `;
 
-    for (const member of summary.members) {
+    for (const member of summary.members as any[]) {
       html += `
         <tr>
-          <td class="text-left">${member.memberName}</td>
-          <td>${member.morningCount}</td>
-          <td>${member.afternoonCount}</td>
-          <td>${member.nightCount}</td>
-          <td class="text-right">₹${member.totalCost}</td>
+          <td class="text-left">${member.full_name || member.member_name}</td>
+          <td>${member.morning_count ?? member.total_morning ?? 0}</td>
+          <td>${member.afternoon_count ?? member.total_afternoon ?? 0}</td>
+          <td>${member.night_count ?? member.total_night ?? 0}</td>
+          <td class="text-right">₹${member.total_cost || 0}</td>
         </tr>
       `;
     }
@@ -196,28 +195,52 @@ export async function exportToPdf(monthStr: string) {
     // --------------------------------------------------------
     // PAGES 2 to N+1: INDIVIDUAL MEMBERS
     // --------------------------------------------------------
-    for (const member of summary.members) {
-      const details = await getMemberMonthlyDetails(member.memberId, monthStr);
-      if (!details) continue;
+    const start = startOfMonth(parseISO(`${monthStr}-01`));
+    const end = endOfMonth(start);
+    const monthDaysStr = eachDayOfInterval({ start, end }).map((d) => format(d, 'yyyy-MM-dd'));
 
-      const firstDays = details.days.slice(0, 14);
-      const secondDays = details.days.slice(14);
+    for (const member of summary.members as any[]) {
+      const memberId = member.user_id || member.member_id;
+      const memberName = member.full_name || member.member_name;
+      const memberAttendance = allAttendance.filter((a: any) => a.user_id === memberId);
+      
+      const memberDays = monthDaysStr.map(dateStr => {
+        const att = memberAttendance.find((a: any) => a.date === dateStr);
+        const morning = !!att?.morning;
+        const afternoon = !!att?.afternoon;
+        const night = !!att?.night;
+        
+        // Use historical price if available, otherwise current prices as fallback
+        const mPrice = (att as any)?.prices?.morning ?? prices.morning;
+        const aPrice = (att as any)?.prices?.afternoon ?? prices.afternoon;
+        const nPrice = (att as any)?.prices?.night ?? prices.night;
+        
+        let dayTotal = 0;
+        if (morning) dayTotal += Number(mPrice);
+        if (afternoon) dayTotal += Number(aPrice);
+        if (night) dayTotal += Number(nPrice);
+        
+        return { date: dateStr, morning, afternoon, night, dayTotal };
+      });
 
-      // --- MEMBER PAGE 1 (Days 1-15) ---
+      const firstDays = memberDays.slice(0, 14);
+      const secondDays = memberDays.slice(14);
+
+      // --- MEMBER PAGE 1 (Days 1-14) ---
       html += `<div class="page-break"></div>`;
       html += `
         <div class="member-header">
           <div class="title">MEALMATE</div>
-          <div class="subtitle" style="text-transform: uppercase; margin-top: 10px; font-weight: bold; color: #000;">${details.member.name}</div>
+          <div class="subtitle" style="text-transform: uppercase; margin-top: 10px; font-weight: bold; color: #000;">${memberName}</div>
           <div style="margin-top: 5px;">${monthFormatted}</div>
         </div>
 
         <div class="section-title">MEAL SUMMARY</div>
         <table>
           <tr><th class="text-left">Meal Type</th><th>Count</th></tr>
-          <tr><td class="text-left">Morning</td><td>${details.morningCount}</td></tr>
-          <tr><td class="text-left">Afternoon</td><td>${details.afternoonCount}</td></tr>
-          <tr><td class="text-left">Night</td><td>${details.nightCount}</td></tr>
+          <tr><td class="text-left">Morning</td><td>${member.morning_count ?? member.total_morning ?? 0}</td></tr>
+          <tr><td class="text-left">Afternoon</td><td>${member.afternoon_count ?? member.total_afternoon ?? 0}</td></tr>
+          <tr><td class="text-left">Night</td><td>${member.night_count ?? member.total_night ?? 0}</td></tr>
         </table>
 
         <div class="section-title">DAILY REPORT</div>
@@ -252,7 +275,7 @@ export async function exportToPdf(monthStr: string) {
         </table>
       `;
 
-      // --- MEMBER PAGE 2 (Days 16-End) ---
+      // --- MEMBER PAGE 2 (Days 15-End) ---
       html += `<div class="page-break"></div>`;
       html += `
         <table>
@@ -285,7 +308,7 @@ export async function exportToPdf(monthStr: string) {
       html += `
           <tr class="grand-total-row">
             <td class="text-left" colspan="4">MONTHLY TOTAL</td>
-            <td class="text-right">₹${details.grandTotal}</td>
+            <td class="text-right">₹${member.total_cost || 0}</td>
           </tr>
         </table>
       `;
@@ -297,56 +320,53 @@ export async function exportToPdf(monthStr: string) {
     `;
 
     if (Platform.OS === 'web') {
-  const printWindow = window.open('', '_blank');
+      const printWindow = window.open('', '_blank');
 
-  if (!printWindow) {
-    throw new Error(
-      'Unable to open print window. Please allow pop-ups for MealMate.'
-    );
-  }
-
-  printWindow.document.open();
-  printWindow.document.write(html);
-  printWindow.document.close();
-
-  printWindow.onload = () => {
-    printWindow.focus();
-    printWindow.print();
-  };
-} else {
-      console.log('PDF: starting generation');
-      const { uri } = await Print.printToFileAsync({
-        html,
-      });
-
-      const filename = `MealMate_Report_${monthStr}.pdf`;
-      const finalUri = `${FileSystem.cacheDirectory}${filename}`;
-
-      await FileSystem.copyAsync({
-        from: uri,
-        to: finalUri,
-      });
-
-      const info = await FileSystem.getInfoAsync(finalUri);
-
-      console.log('PDF: generated', uri);
-      console.log('PDF: final URI:', finalUri);
-      console.log('PDF: exists:', info.exists);
-      if (info.exists) {
-        console.log('PDF: size:', info.size);
+      if (!printWindow) {
+        throw new Error(
+          'Unable to open print window. Please allow pop-ups for MealMate.'
+        );
       }
 
-      console.log('PDF: starting share');
-      const isSharingAvailable = await Sharing.isAvailableAsync();
-      console.log('Sharing available:', isSharingAvailable);
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
 
+      printWindow.onload = () => {
+        printWindow.focus();
+        printWindow.print();
+      };
+    } else {
+      console.log('PDF: starting generation');
+      const Print = require('expo-print');
+      const FileSystem = require('expo-file-system/legacy');
+      const Sharing = require('expo-sharing');
+
+      const { base64 } = await Print.printToFileAsync({
+        html,
+        base64: true
+      });
+
+      // @ts-ignore - cacheDirectory might be missing from TS types
+      const cacheDir = FileSystem.cacheDirectory;
+      const filename = `MealMate_Report_${monthStr}.pdf`;
+      const finalUri = `${cacheDir}${filename}`;
+
+      await FileSystem.writeAsStringAsync(finalUri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      console.log('PDF: generated', finalUri);
+      console.log('PDF: starting share');
+      
+      const isSharingAvailable = await Sharing.isAvailableAsync();
+      
       if (isSharingAvailable) {
         await Sharing.shareAsync(finalUri, {
           mimeType: 'application/pdf',
           dialogTitle: filename,
           UTI: 'com.adobe.pdf'
         });
-        console.log('PDF: share completed');
       }
     }
 

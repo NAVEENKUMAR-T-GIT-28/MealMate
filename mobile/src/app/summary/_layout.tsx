@@ -4,6 +4,7 @@ import { Stack } from 'expo-router';
 export default function SummaryLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
       <Stack.Screen name="[month]" />
       <Stack.Screen name="member/[memberId]/[month]" />
     </Stack>
