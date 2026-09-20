@@ -10,6 +10,9 @@
     },
     "preview": {
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://meal-mate-backend-y9g5.onrender.com"
+      },
       "android": {
         "buildType": "apk"
       }

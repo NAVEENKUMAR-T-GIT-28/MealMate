@@ -7,6 +7,8 @@ const defaultHost = isWeb ? 'http://localhost:5000' : 'http://10.0.2.2:5000';
 const baseUrl = process.env.EXPO_PUBLIC_API_URL || defaultHost;
 const API_URL = `${baseUrl}/api`;
 
+console.log("[DIAGNOSTIC] Final Resolved API_URL:", API_URL);
+
 const client = axios.create({
   baseURL: API_URL,
   headers: {
