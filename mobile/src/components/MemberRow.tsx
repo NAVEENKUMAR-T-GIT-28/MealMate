@@ -29,7 +29,7 @@ export const MemberRow = React.memo(function MemberRow({
   return (
     <Animated.View
       entering={FadeInRight.delay(index * 60).springify()}
-      style={styles.container}
+      style={[styles.container, { opacity: disabled ? 0.5 : 1 }]}
     >
       <View style={styles.nameSection}>
         <View style={styles.avatar}>

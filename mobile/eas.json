@@ -11,14 +11,19 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://meal-mate-backend-y9g5.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://mealmate-backend-y9g5.onrender.com",
+        "EXPO_PUBLIC_WEB_URL": "https://meal-mate-tracker.vercel.app"
       },
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://mealmate-backend-y9g5.onrender.com",
+        "EXPO_PUBLIC_WEB_URL": "https://meal-mate-tracker.vercel.app"
+      }
     }
   },
   "submit": {

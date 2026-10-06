@@ -81,22 +81,29 @@ export default function DashboardScreen() {
   // 2. Group Admin
   // 3. Alphabetical order for remaining members
   const sortedAttendanceData = useMemo(() => {
-    if (!attendanceData || attendanceData.length === 0) return [];
+    if (!membersData || membersData.length === 0) return [];
     
-    const list = [...attendanceData];
+    // Map membersData to include attendance info
+    const list = membersData.map((member) => {
+      const attendance = attendanceData.find((a) => a.user_id === member.user_id);
+      return {
+        user_id: member.user_id,
+        member_name: member.name,
+        role: member.role,
+        morning: attendance ? !!attendance.morning : false,
+        afternoon: attendance ? !!attendance.afternoon : false,
+        night: attendance ? !!attendance.night : false,
+      };
+    });
     
     return list.sort((a, b) => {
       // Rule 1: Current user always at top
       if (user && a.user_id === user.id) return -1;
       if (user && b.user_id === user.id) return 1;
 
-      // Find member roles from group members list
-      const roleA = membersData?.find((m) => m.user_id === a.user_id)?.role;
-      const roleB = membersData?.find((m) => m.user_id === b.user_id)?.role;
-
       // Rule 2: Admin comes next
-      if (roleA === 'admin' && roleB !== 'admin') return -1;
-      if (roleB === 'admin' && roleA !== 'admin') return 1;
+      if (a.role === 'admin' && b.role !== 'admin') return -1;
+      if (b.role === 'admin' && a.role !== 'admin') return 1;
 
       // Rule 3: Alphabetical sort for remaining users
       const nameA = a.member_name || '';
@@ -276,9 +283,9 @@ export default function DashboardScreen() {
               <Text style={{ color: colors.primary, fontWeight: '600' }}>Retry</Text>
             </TouchableOpacity>
           </View>
-        ) : attendanceData.length === 0 ? (
+        ) : sortedAttendanceData.length === 0 ? (
           <View style={styles.emptyRoster}>
-            <Text style={{ color: colors.textMuted }}>No attendance records found for this date.</Text>
+            <Text style={{ color: colors.textMuted }}>No members found in this group.</Text>
           </View>
         ) : (
           sortedAttendanceData.map((record, index) => (
